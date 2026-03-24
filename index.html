@@ -1,33 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#446ccf" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="#446ccf" />
-    <link rel="stylesheet" href="/src/css/styles.css" />
-    <link rel="canonical" href="https://colorstash.glitch.me/" />
-    <link
-      rel="shortcut icon"
-      href="https://cdn.glitch.com/6050e61e-9c5c-4031-bae1-4271ff317929%2Ficon-16x16.ico?v=1594997182109"
-    />
-    <script src="/src/js/main.js" defer></script>
-    <title>Color Stash</title>
-  </head>
-  <body>
-    <div class="container">
-      <div id="savedColors"></div>
-      <div id="preview">
-        <div class="color-container">
-          #
-          <input
-            id="colorInput"
-            type="text"
-            placeholder="446ccf"
-            maxlength="6"
-          />
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#121212" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="#121212" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+    integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./src/css/styles.css" />
+  <link rel="canonical" href="https://colorstash.glitch.me/" />
+  <link rel="shortcut icon"
+    href="https://cdn.glitch.com/6050e61e-9c5c-4031-bae1-4271ff317929%2Ficon-16x16.ico?v=1594997182109" />
+  <script src="./src/js/main.js" defer></script>
+  <title>Color Stash</title>
+</head>
+
+<body>
+  <main class="app-shell">
+    <div class="sidebar">
+      <section class="intro-panel">
+        <div class="panel-header">
+          <div class="panel-header-top">
+            <p class="eyebrow">Local palette</p>
+            <button id="themeToggleButton" class="theme-toggle" type="button" aria-live="polite" title="Theme toggle">
+              <span class="theme-toggle-track" aria-hidden="true">
+                <span id="themeToggleKnob" class="theme-toggle-knob">
+                  <span id="themeToggleIcon" class="theme-toggle-icon">◐</span>
+                </span>
+              </span>
+            </button>
+          </div>
+          <h1>Color Stash</h1>
+          <p class="panel-copy">
+            Build a personal bank of colors, keep the good ones around, and
+            jump back to them instantly.
+          </p>
+        </div>
+      </section>
+
+      <section class="stash-panel">
+        <div class="stash-toolbar">
+          <div>
+            <p class="toolbar-label">Saved shades</p>
+            <p id="stashCount" class="toolbar-value">0 colors</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="clearColorsButton" class="ghost-button icon-button" type="button" aria-label="Clear all colors"
+              title="Clear all">
+              <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="savedColors" class="saved-colors" aria-live="polite"></div>
+      </section>
+
+      <template id="colorCardTemplate">
+        <article class="saved-color-card">
+          <button class="saved-color-swatch" type="button"></button>
+          <div class="saved-color-meta">
+            <p class="saved-color-hex"></p>
+            <p class="saved-color-rgb"></p>
+          </div>
+          <div class="saved-color-actions">
+            <button class="card-button copy-button icon-button" type="button" aria-label="Copy color" title="Copy">
+              <i class="fa-solid fa-copy" aria-hidden="true"></i>
+            </button>
+            <button class="card-button delete-button icon-button" type="button" aria-label="Delete color"
+              title="Delete">
+              <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            </button>
+          </div>
+        </article>
+      </template>
+    </div>
+
+    <section id="preview" class="preview-panel">
+      <div class="preview-backdrop"></div>
+
+      <div class="preview-content">
+        <div class="preview-stage">
+          <div id="previewSwatch" class="preview-swatch">
+            <div class="preview-swatch-meta">
+              <div class="preview-topline">
+                <p class="eyebrow">Live preview</p>
+                <p id="activeRgbLabel" class="preview-rgb">rgb(68, 108, 207)</p>
+              </div>
+
+              <div class="preview-heading">
+                <h2 id="activeHexLabel">#446CCF</h2>
+                <p class="preview-swatch-label">Current shade</p>
+              </div>
+
+              <label class="input-label" for="colorInput">Hex color</label>
+              <div class="input-row">
+                <span class="input-prefix">#</span>
+                <input id="colorInput" type="text" inputmode="text" autocomplete="off" spellcheck="false"
+                  placeholder="446CCF" maxlength="6" aria-describedby="statusMessage" />
+                <label class="color-picker-shell" for="colorPickerInput" title="Pick a color">
+                  <input id="colorPickerInput" class="color-picker-input" type="color" value="#446ccf"
+                    aria-label="Choose a color" />
+                </label>
+              </div>
+              <div class="action-row">
+                <button id="saveColorButton" class="primary-button" type="button">
+                  <i class="fa-solid fa-bookmark button-icon" aria-hidden="true"></i>
+                  <span>Save color</span>
+                </button>
+                <button id="copyColorButton" class="secondary-button" type="button">
+                  <i class="fa-solid fa-copy button-icon" aria-hidden="true"></i>
+                  <span>Copy hex</span>
+                </button>
+                <button id="randomColorButton" class="ghost-button" type="button">
+                  <i class="fa-solid fa-shuffle button-icon" aria-hidden="true"></i>
+                  <span>Random</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </body>
+    </section>
+  </main>
+</body>
+
 </html>
