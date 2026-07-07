@@ -27,6 +27,10 @@
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --current-color: #446ccf;
   --current-color-glow: rgba(68, 108, 207, 0.3);
+  /* Elevation — dark theme: crisp shadow + subtle top highlight. */
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 36px rgba(0, 0, 0, 0.5);
+  --shadow-hover: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 :root[data-theme="light"] {
@@ -45,6 +49,10 @@
   --primary-bg: rgba(0, 0, 0, 0.08);
   --primary-hover: rgba(0, 0, 0, 0.12);
   --overlay: rgba(255, 255, 255, 0.56);
+  /* Elevation — light theme: soft, layered, cool-neutral. No white inset (invisible on white). */
+  --shadow-panel: 0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 12px rgba(17, 24, 39, 0.06);
+  --shadow-float: 0 2px 6px rgba(17, 24, 39, 0.06), 0 12px 32px rgba(17, 24, 39, 0.12);
+  --shadow-hover: 0 4px 14px rgba(17, 24, 39, 0.12);
 }
 
 * {
@@ -141,8 +149,8 @@ p, h1, h2 { margin: 0; }
   background: var(--panel);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 24px rgba(0,0,0,0.4);
-  transition: background-color var(--transition), border-color var(--transition);
+  box-shadow: var(--shadow-panel);
+  transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
 .intro-panel { padding: 1.25rem; }
@@ -236,14 +244,13 @@ p, h1, h2 { margin: 0; }
   background: var(--button-bg);
   color: var(--muted);
   font-size: 0.9rem;
-  transition: background-color var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
 }
 
 .theme-toggle:hover {
   background: var(--button-hover);
   border-color: var(--line-strong);
   color: var(--text);
-  transform: rotate(15deg);
 }
 
 /* ── Stash toolbar ───────────────────────────── */
@@ -353,13 +360,12 @@ p, h1, h2 { margin: 0; }
   background: var(--panel-2);
   position: relative;
   overflow: hidden;
-  transition: border-color var(--transition), background-color var(--transition), transform var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
   animation: cardIn 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .saved-color-card:hover {
   border-color: var(--line-strong);
-  transform: translateX(2px);
   box-shadow: -4px 0 16px var(--card-glow, transparent);
 }
 
@@ -376,14 +382,13 @@ p, h1, h2 { margin: 0; }
   width: 44px;
   height: 44px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255,255,255,0.12);
-  transition: transform var(--transition), box-shadow var(--transition);
+  border: 1px solid var(--line);
+  transition: box-shadow var(--transition);
   flex-shrink: 0;
 }
 
 .saved-color-swatch:hover {
-  transform: scale(1.08);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-hover);
 }
 
 .saved-color-meta { min-width: 0; }
@@ -556,7 +561,7 @@ p, h1, h2 { margin: 0; }
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--line);
   transition: background-color var(--transition), border-color var(--transition);
-  box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.06) inset;
+  box-shadow: var(--shadow-float);
 }
 
 .preview-topline {
@@ -635,12 +640,11 @@ p, h1, h2 { margin: 0; }
   border: 2px solid var(--line-strong);
   overflow: hidden;
   cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition);
+  transition: border-color var(--transition);
 }
 
 .color-picker-shell:hover {
-  transform: scale(1.1);
-  border-color: rgba(255,255,255,0.3);
+  border-color: var(--muted);
 }
 
 .color-picker-input {
@@ -667,11 +671,10 @@ p, h1, h2 { margin: 0; }
   border: 1px solid var(--line-strong);
   background: var(--button-bg);
   color: var(--muted);
-  transition: transform var(--transition), background-color var(--transition), color var(--transition), border-color var(--transition);
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
 }
 
 .eyedropper-button:hover {
-  transform: scale(1.1);
   background: var(--button-hover);
   color: var(--text);
 }
@@ -748,12 +751,12 @@ p, h1, h2 { margin: 0; }
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   padding: 0;
-  transition: transform var(--transition), box-shadow var(--transition);
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
 
 .shade-swatch:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-hover);
   z-index: 1;
 }
 
@@ -778,21 +781,19 @@ p, h1, h2 { margin: 0; }
   justify-items: start;
   padding: 0;
   background: transparent;
-  transition: transform var(--transition);
 }
-
-.harmony-swatch:hover { transform: translateY(-2px); }
 
 .harmony-swatch .harmony-chip {
   width: 3.4rem;
   height: 2rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  transition: box-shadow var(--transition);
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
 
 .harmony-swatch:hover .harmony-chip {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-hover);
 }
 
 .harmony-swatch .harmony-label {
@@ -898,7 +899,7 @@ p, h1, h2 { margin: 0; }
   border: 1px solid var(--line-strong);
   color: var(--text);
   font-size: 0.9rem;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06) inset;
+  box-shadow: var(--shadow-float);
   animation: toastIn 200ms cubic-bezier(0.4, 0, 0.2, 1) both;
   pointer-events: all;
   max-width: 340px;
@@ -999,27 +1000,22 @@ p, h1, h2 { margin: 0; }
     flex-direction: column;
   }
 
+  /* Keep the actions as one row of evenly-sized, touch-friendly icon buttons. */
   .toolbar-actions {
     width: 100%;
-    flex-direction: column;
+    gap: 0.4rem;
   }
 
-  .toolbar-actions .ghost-button { width: 100%; }
+  .toolbar-actions .icon-button {
+    flex: 1;
+    min-height: 44px;
+  }
 
   .saved-colors {
     flex: 0 0 auto;
     overflow: visible;
     min-height: auto;
     padding-right: 0;
-  }
-
-  .saved-color-card {
-    grid-template-columns: auto 1fr;
-  }
-
-  .saved-color-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
   }
 
   .action-row { grid-template-columns: 1fr; }
@@ -1031,6 +1027,11 @@ p, h1, h2 { margin: 0; }
   }
 
   .toast { max-width: 100%; }
+}
+
+/* Keyboard shortcuts are meaningless on touch-only devices — hide the hint. */
+@media (hover: none) and (pointer: coarse) {
+  .shortcut-hint { display: none; }
 }
 
 /* ── Reduced motion ──────────────────────────── */
