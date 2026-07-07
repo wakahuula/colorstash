@@ -69,6 +69,10 @@
       <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
       <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
     </symbol>
+    <symbol id="i-braces" viewBox="0 0 24 24">
+      <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" />
+      <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
+    </symbol>
     <symbol id="i-download" viewBox="0 0 24 24">
       <path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" />
     </symbol>
@@ -118,6 +122,10 @@
               aria-label="Export palette as a JSON file" title="Export JSON">
               <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
             </button>
+            <button id="exportCssButton" class="ghost-button icon-button" type="button"
+              aria-label="Copy palette as CSS custom properties" title="Copy as CSS">
+              <svg class="icon" aria-hidden="true"><use href="#i-braces"></use></svg>
+            </button>
             <button id="importColorsButton" class="ghost-button icon-button" type="button"
               aria-label="Import a palette from a JSON file" title="Import JSON">
               <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>
@@ -135,9 +143,11 @@
       </section>
 
       <template id="colorCardTemplate">
-        <article class="saved-color-card">
+        <article class="saved-color-card" draggable="true">
           <button class="saved-color-swatch" type="button"></button>
           <div class="saved-color-meta">
+            <input class="saved-color-name" type="text" autocomplete="off" spellcheck="false"
+              maxlength="40" placeholder="Name this color" />
             <p class="saved-color-hex copyable" role="button" tabindex="0" title="Click to copy hex"></p>
             <p class="saved-color-rgb copyable" role="button" tabindex="0" title="Click to copy RGB"></p>
             <p class="saved-color-hsl copyable" role="button" tabindex="0" title="Click to copy HSL"></p>

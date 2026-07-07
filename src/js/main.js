@@ -30,6 +30,7 @@ const randomColorButton = document.getElementById("randomColorButton");
 const clearColorsButton = document.getElementById("clearColorsButton");
 const shareColorsButton = document.getElementById("shareColorsButton");
 const exportColorsButton = document.getElementById("exportColorsButton");
+const exportCssButton = document.getElementById("exportCssButton");
 const importColorsButton = document.getElementById("importColorsButton");
 const importFileInput = document.getElementById("importFileInput");
 const eyeDropperButton = document.getElementById("eyeDropperButton");
@@ -46,6 +47,7 @@ const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
 let savedColorStash = loadColorStash();
 let themePreference = loadThemePreference();
+let draggedHex = null;
 
 init();
 registerServiceWorker();
@@ -80,6 +82,7 @@ function init() {
   clearColorsButton.addEventListener("click", clearAllColors);
   shareColorsButton.addEventListener("click", sharePalette);
   exportColorsButton.addEventListener("click", exportPalette);
+  exportCssButton.addEventListener("click", exportPaletteAsCss);
   importColorsButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFile);
   themeToggleButton.addEventListener("click", cycleThemePreference);
@@ -139,6 +142,17 @@ function handleGlobalKeydown(event) {
     return;
   }
 
+  // Arrow keys move focus between saved-color swatches when one is focused.
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    const swatch = target instanceof HTMLElement ? target.closest(".saved-color-swatch") : null;
+    if (!swatch) return;
+    event.preventDefault();
+    const swatches = [...savedColorsEl.querySelectorAll(".saved-color-swatch")];
+    const next = swatches[swatches.indexOf(swatch) + (event.key === "ArrowDown" ? 1 : -1)];
+    if (next) next.focus();
+    return;
+  }
+
   switch (event.key.toLowerCase()) {
     case "s":
       event.preventDefault();
@@ -165,13 +179,13 @@ function saveCurrentColor() {
   }
 
   const normalized = normalizeHex(color);
-  if (savedColorStash.includes(normalized)) {
+  if (savedColorStash.some((entry) => entry.hex === normalized)) {
     showToast(`${formatHex(normalized)} is already in your stash.`, "error");
     setStatus(`${formatHex(normalized)} is already in your stash.`, "error");
     return;
   }
 
-  savedColorStash.unshift(normalized);
+  savedColorStash.unshift({ hex: normalized, name: "" });
   persistColorStash();
   renderSavedColors();
   applyColor(normalized);
@@ -322,63 +336,145 @@ function renderSavedColors() {
   }
 
   const fragment = document.createDocumentFragment();
-  savedColorStash.forEach((color) => {
-    fragment.appendChild(createColorCard(color));
+  savedColorStash.forEach((entry) => {
+    fragment.appendChild(createColorCard(entry));
   });
 
   savedColorsEl.appendChild(fragment);
   updateStashCount();
 }
 
-function createColorCard(color) {
+function createColorCard(entry) {
+  const hex = entry.hex;
   const card = colorCardTemplate.content.firstElementChild.cloneNode(true);
   const swatchButton = card.querySelector(".saved-color-swatch");
+  const nameInput = card.querySelector(".saved-color-name");
   const hexLabel = card.querySelector(".saved-color-hex");
   const rgbLabel = card.querySelector(".saved-color-rgb");
   const hslLabel = card.querySelector(".saved-color-hsl");
   const copyButton = card.querySelector(".copy-button");
   const deleteButton = card.querySelector(".delete-button");
 
-  swatchButton.style.backgroundColor = formatHex(color);
-  swatchButton.setAttribute("aria-label", `Use ${formatHex(color)}`);
-  hexLabel.textContent = formatHex(color);
-  rgbLabel.textContent = hexToRgbString(color);
-  if (hslLabel) hslLabel.textContent = hexToHslString(color);
-  card.dataset.color = color;
+  swatchButton.style.backgroundColor = formatHex(hex);
+  swatchButton.setAttribute("aria-label", `Use ${formatHex(hex)}`);
+  hexLabel.textContent = formatHex(hex);
+  rgbLabel.textContent = hexToRgbString(hex);
+  if (hslLabel) hslLabel.textContent = hexToHslString(hex);
+  card.dataset.color = hex;
 
-  const glow = hexToRgbaString(color, 0.25);
-  card.style.setProperty("--card-color", formatHex(color));
+  if (nameInput) {
+    nameInput.value = entry.name || "";
+    nameInput.setAttribute("aria-label", `Name for ${formatHex(hex)}`);
+    nameInput.addEventListener("change", () => renameSavedColor(hex, nameInput.value));
+    nameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") nameInput.blur();
+    });
+  }
+
+  const glow = hexToRgbaString(hex, 0.25);
+  card.style.setProperty("--card-color", formatHex(hex));
   card.style.setProperty("--card-glow", glow);
 
   swatchButton.addEventListener("click", () => {
-    colorInput.value = color;
-    applyColor(color);
-    setStatus(`${formatHex(color)} loaded from your stash.`);
+    colorInput.value = hex;
+    applyColor(hex);
+    setStatus(`${formatHex(hex)} loaded from your stash.`);
   });
 
-  hexLabel.addEventListener("click", () => copyText(formatHex(color)));
+  hexLabel.addEventListener("click", () => copyText(formatHex(hex)));
   hexLabel.addEventListener("keydown", handleCopyableKeydown);
-  rgbLabel.addEventListener("click", () => copyText(hexToRgbString(color)));
+  rgbLabel.addEventListener("click", () => copyText(hexToRgbString(hex)));
   rgbLabel.addEventListener("keydown", handleCopyableKeydown);
   if (hslLabel) {
-    hslLabel.addEventListener("click", () => copyText(hexToHslString(color)));
+    hslLabel.addEventListener("click", () => copyText(hexToHslString(hex)));
     hslLabel.addEventListener("keydown", handleCopyableKeydown);
   }
 
   copyButton.addEventListener("click", async () => {
-    await copyText(formatHex(color));
+    await copyText(formatHex(hex));
   });
 
   deleteButton.addEventListener("click", () => {
-    deleteSavedColor(color, card);
+    deleteSavedColor(hex, card);
+  });
+
+  card.addEventListener("dragstart", (event) => {
+    // Don't start a reorder drag from the name field or the copy/delete buttons.
+    if (event.target.closest("input, .card-button")) {
+      event.preventDefault();
+      return;
+    }
+    draggedHex = hex;
+    card.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", hex);
+  });
+
+  card.addEventListener("dragover", (event) => {
+    if (!draggedHex || draggedHex === hex) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rect = card.getBoundingClientRect();
+    const after = event.clientY > rect.top + rect.height / 2;
+    card.classList.toggle("drag-after", after);
+    card.classList.toggle("drag-before", !after);
+  });
+
+  card.addEventListener("dragleave", () => {
+    card.classList.remove("drag-before", "drag-after");
+  });
+
+  card.addEventListener("drop", (event) => {
+    if (!draggedHex || draggedHex === hex) return;
+    event.preventDefault();
+    const insertAfter = card.classList.contains("drag-after");
+    card.classList.remove("drag-before", "drag-after");
+    reorderSavedColor(draggedHex, hex, insertAfter);
+  });
+
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    savedColorsEl.querySelectorAll(".drag-before, .drag-after")
+      .forEach((el) => el.classList.remove("drag-before", "drag-after"));
+    draggedHex = null;
   });
 
   return card;
 }
 
-function deleteSavedColor(color, cardEl) {
+function reorderSavedColor(fromHex, toHex, insertAfter) {
+  if (!fromHex || fromHex === toHex) return;
+
+  const fromIndex = savedColorStash.findIndex((entry) => entry.hex === fromHex);
+  if (fromIndex < 0) return;
+
+  const [moved] = savedColorStash.splice(fromIndex, 1);
+  let toIndex = savedColorStash.findIndex((entry) => entry.hex === toHex);
+  if (toIndex < 0) {
+    savedColorStash.splice(fromIndex, 0, moved); // target vanished — undo the removal
+    return;
+  }
+  if (insertAfter) toIndex += 1;
+
+  savedColorStash.splice(toIndex, 0, moved);
+  persistColorStash();
+  renderSavedColors();
+  setStatus(`Reordered ${formatHex(fromHex)}.`);
+}
+
+function renameSavedColor(hex, name) {
+  const entry = savedColorStash.find((c) => c.hex === hex);
+  if (!entry) return;
+  const trimmed = name.trim();
+  if (entry.name === trimmed) return;
+  entry.name = trimmed;
+  persistColorStash();
+  setStatus(trimmed ? `Named ${formatHex(hex)} “${trimmed}”.` : `Cleared the name for ${formatHex(hex)}.`);
+}
+
+function deleteSavedColor(hex, cardEl) {
   // Mutate + persist synchronously so rapid deletes never race on the animation callback.
-  savedColorStash = savedColorStash.filter((c) => c !== color);
+  savedColorStash = savedColorStash.filter((c) => c.hex !== hex);
   persistColorStash();
   updateStashCount();
 
@@ -392,8 +488,8 @@ function deleteSavedColor(color, cardEl) {
     renderSavedColors();
   }
 
-  showToast(`${formatHex(color)} removed.`, "success");
-  setStatus(`${formatHex(color)} removed from your stash.`, "success");
+  showToast(`${formatHex(hex)} removed.`, "success");
+  setStatus(`${formatHex(hex)} removed from your stash.`, "success");
 }
 
 function applyColor(color, syncInput = true) {
@@ -437,10 +533,39 @@ function updateStashCount() {
 function loadColorStash() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    return parsed.filter(isValidHex).map(normalizeHex);
+    return parsed.map(toStashEntry).filter(Boolean);
   } catch {
     return [];
   }
+}
+
+// Accepts the legacy string format ("446CCF") and the current object format ({hex, name}).
+function toStashEntry(value) {
+  const raw = typeof value === "string" ? value : value && value.hex;
+  if (!isValidHex(raw)) return null;
+  const name = value && typeof value.name === "string" ? value.name.trim() : "";
+  return { hex: normalizeHex(raw), name };
+}
+
+// Prepends new colors (newest-first), dedupes by hex, and fills empty names from imports.
+// Returns how many colors were newly added.
+function mergeStashEntries(incoming) {
+  const byHex = new Map(savedColorStash.map((entry) => [entry.hex, entry]));
+  const fresh = [];
+
+  incoming.forEach((entry) => {
+    const existing = byHex.get(entry.hex);
+    if (existing) {
+      if (!existing.name && entry.name) existing.name = entry.name;
+      return;
+    }
+    const created = { hex: entry.hex, name: entry.name };
+    byHex.set(entry.hex, created);
+    fresh.push(created);
+  });
+
+  savedColorStash = [...fresh, ...savedColorStash];
+  return fresh.length;
 }
 
 function persistColorStash() {
@@ -665,7 +790,7 @@ async function sharePalette() {
   }
 
   const url = new URL(window.location.href);
-  url.hash = savedColorStash.join(",");
+  url.hash = savedColorStash.map((entry) => entry.hex).join(",");
   window.history.replaceState(null, "", url.toString());
 
   try {
@@ -682,18 +807,17 @@ function importPaletteFromHash() {
   const hash = window.location.hash.replace(/^#/, "");
   if (!hash) return null;
 
-  const incoming = hash.split(",").map(sanitizeHex).filter(isValidHex).map(normalizeHex);
+  const incoming = hash.split(",").map(toStashEntry).filter(Boolean);
   // Always clear the hash so a refresh doesn't re-import the same palette.
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
   if (!incoming.length) return null;
 
-  const merged = [...incoming, ...savedColorStash];
-  savedColorStash = merged.filter((color, index) => merged.indexOf(color) === index);
+  const added = mergeStashEntries(incoming);
   persistColorStash();
-  const label = `Imported ${incoming.length} shared color${incoming.length === 1 ? "" : "s"}.`;
+  const label = `Imported ${added} shared color${added === 1 ? "" : "s"}.`;
   showToast(label, "success");
   setStatus(label, "success");
-  return incoming[0];
+  return incoming[0].hex;
 }
 
 /* ── Export / import (JSON file) ─────────────── */
@@ -705,7 +829,10 @@ function exportPalette() {
     return;
   }
 
-  const payload = { generator: "Color Stash", colors: savedColorStash.map((color) => `#${color}`) };
+  const payload = {
+    generator: "Color Stash",
+    colors: savedColorStash.map((entry) => ({ hex: `#${entry.hex}`, name: entry.name })),
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -718,6 +845,29 @@ function exportPalette() {
 
   showToast(`Exported ${savedColorStash.length} colors.`, "success");
   setStatus(`Exported ${savedColorStash.length} colors to a file.`, "success");
+}
+
+async function exportPaletteAsCss() {
+  if (!savedColorStash.length) {
+    showToast("Save some colors first, then copy them.");
+    setStatus("Save some colors first, then copy them.");
+    return;
+  }
+
+  const lines = savedColorStash.map((entry, index) => {
+    const comment = entry.name ? ` /* ${entry.name.replace(/\*\//g, "")} */` : "";
+    return `  --color-${index + 1}: #${entry.hex};${comment}`;
+  });
+  const css = `:root {\n${lines.join("\n")}\n}`;
+
+  try {
+    await navigator.clipboard.writeText(css);
+    showToast(`Copied ${savedColorStash.length} colors as CSS.`, "success");
+    setStatus("Palette copied as CSS custom properties.", "success");
+  } catch {
+    showToast("Couldn't copy the CSS.", "error");
+    setStatus("Couldn't copy the CSS to your clipboard.", "error");
+  }
 }
 
 function handleImportFile(event) {
@@ -736,20 +886,17 @@ function handleImportFile(event) {
       const list = Array.isArray(parsed) ? parsed : parsed.colors;
       if (!Array.isArray(list)) throw new Error("missing colors array");
 
-      const incoming = list.map((value) => sanitizeHex(String(value))).filter(isValidHex).map(normalizeHex);
+      const incoming = list.map(toStashEntry).filter(Boolean);
       if (!incoming.length) {
         showToast("No valid colors found in that file.", "error");
         setStatus("No valid colors found in that file.", "error");
         return;
       }
 
-      const before = savedColorStash.length;
-      const merged = [...incoming, ...savedColorStash];
-      savedColorStash = merged.filter((color, index) => merged.indexOf(color) === index);
+      const added = mergeStashEntries(incoming);
       persistColorStash();
       renderSavedColors();
 
-      const added = savedColorStash.length - before;
       const label = `Imported ${added} new color${added === 1 ? "" : "s"}.`;
       showToast(label, "success");
       setStatus(label, "success");

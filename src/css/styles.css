@@ -263,14 +263,24 @@ p, h1, h2 { margin: 0; }
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
+
+/* Compact icon buttons so all five actions fit next to the label. */
+.toolbar-actions .icon-button {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0.5rem;
+}
+
+.toolbar-label { white-space: nowrap; }
 
 .toolbar-value {
   margin-top: 0.25rem;
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* ── Saved colors ────────────────────────────── */
@@ -353,6 +363,15 @@ p, h1, h2 { margin: 0; }
   box-shadow: -4px 0 16px var(--card-glow, transparent);
 }
 
+.saved-color-card { cursor: grab; }
+.saved-color-card.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.saved-color-card.drag-before { box-shadow: inset 0 3px 0 var(--current-color); }
+.saved-color-card.drag-after { box-shadow: inset 0 -3px 0 var(--current-color); }
+
 .saved-color-swatch {
   width: 44px;
   height: 44px;
@@ -368,6 +387,32 @@ p, h1, h2 { margin: 0; }
 }
 
 .saved-color-meta { min-width: 0; }
+
+.saved-color-name {
+  width: 100%;
+  margin-bottom: 0.15rem;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+
+.saved-color-name::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.saved-color-name:hover { border-color: var(--line); }
+
+.saved-color-name:focus {
+  outline: none;
+  background: var(--input-bg);
+  border-color: var(--line-strong);
+}
 
 .saved-color-hex {
   font-size: 0.95rem;

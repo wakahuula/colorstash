@@ -38,7 +38,7 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | `execCommand`-Clipboard-Fallback entfernt (reine `navigator.clipboard`-API) | Fixt Copy-falsche-Farbe-Bug bei Stash-Karten |
 | ✅ | `html { font-size: 13px }` → `81.25%` (= 13px bei 16px-Default, skaliert aber mit Nutzer-Einstellung) | a11y (Respekt vor Browser-Default) |
 | ✅ | Doppelte Screenreader-Ansagen behoben: Toast-Container `aria-hidden`, `#statusMessage` (polite) ist alleinige Live-Region | a11y |
-| ⬜ | `↑/↓` durch den Stash navigieren (Auswahl-State nötig) | Power-User-Feel |
+| ✅ | `↑/↓` durch den Stash navigieren (Fokus wandert zwischen den Swatches) | Power-User-Feel |
 
 ## Tier 3 — Größer (halber Tag+)
 
@@ -47,9 +47,9 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | Echte PWA: `manifest.json` + Cache-First-Service-Worker (`sw.js`) + PNG-Icons (192/512, „any maskable" + Apple-Touch); offline verifiziert | Bleibt 100% statisch/GitHub-Pages-tauglich; **Sorgfaltspflicht**: `CACHE_NAME` in `sw.js` bei jedem Deploy hochzählen |
 | ✅ | Export/Import JSON (Blob-Download + FileReader; Import validiert, mergt, dedupliziert) | Reines Blob-Download/FileReader, kein Backend |
 | ✅ | Farb-Harmonien (Komplementär/Triade/Analog) als klickbare, beschriftete Chips | Vanilla-Mathe |
-| ⬜ | CSS-Variables-Export der Palette (`:root { --color-1: … }`) | Ergänzung zum JSON-Export |
-| ⬜ | Benannte Farben / Notizen pro Farbe | Datenmodell `string[]` → `{hex, name}[]`; LocalStorage-Migration nötig |
-| ⬜ | Drag-to-reorder | Einziger Punkt, wo „lightweight" wehtut: Touch-DnD ohne Lib ist fummelig. Falls überhaupt: SortableJS (~4 KB) lokal eingecheckt |
+| ✅ | CSS-Variables-Export der Palette (`:root { --color-1: … }`, Namen als Kommentare) — kopiert in die Zwischenablage | Ergänzung zum JSON-Export |
+| ✅ | Benannte Farben pro Farbe (Inline-Namensfeld je Karte); Namen in Export/Import erhalten | Datenmodell `string[]` → `{hex, name}[]`; rückwärtskompatible LocalStorage-Migration (alte Daten & Share-Links) |
+| ✅ | Drag-to-reorder (native HTML5-DnD, keine Lib, Insert-Indikator) | Desktop-Feature; Touch-DnD bleibt eingeschränkt (bewusst keine Lib, um lightweight zu bleiben) |
 
 ---
 
