@@ -51,6 +51,16 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | Benannte Farben pro Farbe (Inline-Namensfeld je Karte); Namen in Export/Import erhalten | Datenmodell `string[]` → `{hex, name}[]`; rückwärtskompatible LocalStorage-Migration (alte Daten & Share-Links) |
 | ✅ | Drag-to-reorder (native HTML5-DnD, keine Lib, Insert-Indikator) | Desktop-Feature; Touch-DnD bleibt eingeschränkt (bewusst keine Lib, um lightweight zu bleiben) |
 
+## Design-Politur (nachträglich)
+
+| Status | Punkt | Ort |
+|--------|-------|-----|
+| ✅ | Themen-adaptive Elevation-Tokens (`--shadow-panel/-float/-hover`); Light-Theme mit weichen, mehrschichtigen, kühl-neutralen Schatten statt harter schwarzer + unsichtbarer weißer Insets | `styles.css` |
+| ✅ | Swatch-Rand von hartem `rgba(255,255,255,.12)` auf adaptives `var(--line)` (definiert Farbkacheln auch im Light-Theme) | `styles.css` |
+| ✅ | Mobile-Fix: Toolbar-Actions als horizontale Reihe gleich großer 44px-Touch-Buttons statt vertikaler full-width Spalte | `styles.css` |
+| ✅ | Mobile: Farbkarten konsistent 3-spaltig (kein Overflow bei 360/390px); Tastatur-Hinweis auf Touch (`hover:none`) ausgeblendet | `styles.css` |
+| ✅ | Alle Hover-`transform`s entfernt (Theme-Switcher-Tilt, Karten-/Swatch-/Shade-/Harmony-/Picker-/EyeDropper-Bewegung); ruhiges Hover-Feedback über Rahmen + Schatten (`:active`-Press-Skalierung bleibt) | `styles.css` |
+
 ---
 
 ## Bug-Register (aus Code-Review)
