@@ -1,6 +1,14 @@
 const DEFAULT_COLOR = "446CCF";
 const STORAGE_KEY = "savedColorStash";
 const THEME_KEY = "colorStashTheme";
+const SHADE_STOPS = [0.92, 0.82, 0.72, 0.6, 0.5, 0.4, 0.3, 0.2, 0.12];
+const HARMONIES = [
+  { label: "Comp", offset: 180 },
+  { label: "Triad", offset: 120 },
+  { label: "Triad", offset: 240 },
+  { label: "Analog", offset: -30 },
+  { label: "Analog", offset: 30 },
+];
 const THEME_COLORS = {
   dark: "#0c0c0d",
   light: "#f0f0f4",
@@ -20,6 +28,14 @@ const saveColorButton = document.getElementById("saveColorButton");
 const copyColorButton = document.getElementById("copyColorButton");
 const randomColorButton = document.getElementById("randomColorButton");
 const clearColorsButton = document.getElementById("clearColorsButton");
+const shareColorsButton = document.getElementById("shareColorsButton");
+const exportColorsButton = document.getElementById("exportColorsButton");
+const importColorsButton = document.getElementById("importColorsButton");
+const importFileInput = document.getElementById("importFileInput");
+const eyeDropperButton = document.getElementById("eyeDropperButton");
+const contrastRow = document.getElementById("contrastRow");
+const shadesRow = document.getElementById("shadesRow");
+const harmonyRow = document.getElementById("harmonyRow");
 const themeToggleButton = document.getElementById("themeToggleButton");
 const themeToggleIcon = document.getElementById("themeToggleIcon");
 const colorCardTemplate = document.getElementById("colorCardTemplate");
@@ -28,11 +44,21 @@ const themeMeta = document.querySelector('meta[name="theme-color"]');
 
 const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-let currentColor = DEFAULT_COLOR;
 let savedColorStash = loadColorStash();
 let themePreference = loadThemePreference();
 
 init();
+registerServiceWorker();
+
+function registerServiceWorker() {
+  // Needs a secure context (https or localhost) — silently skipped on file://.
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // Registration failure is non-fatal — the app still works online.
+    });
+  });
+}
 
 function init() {
   applyTheme(getResolvedTheme(), false);
@@ -42,15 +68,30 @@ function init() {
   colorInput.addEventListener("input", handleInput);
   colorInput.addEventListener("keydown", handleInputKeydown);
   colorPickerInput.addEventListener("input", handleColorPickerInput);
+  activeRgbLabel.addEventListener("click", copyActiveRgb);
+  activeRgbLabel.addEventListener("keydown", handleCopyableKeydown);
+  if (activeHslLabel) {
+    activeHslLabel.addEventListener("click", copyActiveHsl);
+    activeHslLabel.addEventListener("keydown", handleCopyableKeydown);
+  }
   saveColorButton.addEventListener("click", saveCurrentColor);
   copyColorButton.addEventListener("click", copyCurrentColor);
   randomColorButton.addEventListener("click", applyRandomColor);
   clearColorsButton.addEventListener("click", clearAllColors);
+  shareColorsButton.addEventListener("click", sharePalette);
+  exportColorsButton.addEventListener("click", exportPalette);
+  importColorsButton.addEventListener("click", () => importFileInput.click());
+  importFileInput.addEventListener("change", handleImportFile);
   themeToggleButton.addEventListener("click", cycleThemePreference);
   systemThemeQuery.addEventListener("change", handleSystemThemeChange);
+  document.addEventListener("keydown", handleGlobalKeydown);
 
+  setupEyeDropper();
+
+  const startColor = importPaletteFromHash() || DEFAULT_COLOR;
   renderSavedColors();
-  applyColor(DEFAULT_COLOR);
+  colorInput.value = startColor;
+  applyColor(startColor);
   colorInput.focus();
 }
 
@@ -89,6 +130,31 @@ function handleInputKeydown(event) {
   }
 }
 
+function handleGlobalKeydown(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+  // Don't hijack typing in fields (the hex input accepts "c", etc.).
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.closest("input, textarea, select") || target.isContentEditable)) {
+    return;
+  }
+
+  switch (event.key.toLowerCase()) {
+    case "s":
+      event.preventDefault();
+      saveCurrentColor();
+      break;
+    case "c":
+      event.preventDefault();
+      copyCurrentColor();
+      break;
+    case "r":
+      event.preventDefault();
+      applyRandomColor();
+      break;
+  }
+}
+
 function saveCurrentColor() {
   const color = sanitizeHex(colorInput.value);
 
@@ -123,6 +189,23 @@ async function copyCurrentColor() {
   await copyText(formatHex(normalizeHex(colorInput.value)));
 }
 
+async function copyActiveRgb() {
+  if (!isValidHex(colorInput.value)) return;
+  await copyText(hexToRgbString(colorInput.value));
+}
+
+async function copyActiveHsl() {
+  if (!isValidHex(colorInput.value)) return;
+  await copyText(hexToHslString(colorInput.value));
+}
+
+function handleCopyableKeydown(event) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    event.currentTarget.click();
+  }
+}
+
 function applyRandomColor() {
   const randomColor = Math.floor(Math.random() * 0xffffff)
     .toString(16)
@@ -137,13 +220,25 @@ function applyRandomColor() {
 function clearAllColors() {
   if (!savedColorStash.length) {
     showToast("Your stash is already empty.");
+    setStatus("Your stash is already empty.");
     return;
   }
 
+  const snapshot = savedColorStash;
   savedColorStash = [];
   persistColorStash();
   renderSavedColors();
-  showToast("All saved colors removed.", "success");
+
+  showToast("All saved colors removed.", "success", {
+    label: "Undo",
+    onClick: () => {
+      savedColorStash = snapshot;
+      persistColorStash();
+      renderSavedColors();
+      showToast("Colors restored.", "success");
+      setStatus("Colors restored.", "success");
+    },
+  });
   setStatus("All saved colors removed.", "success");
 }
 
@@ -184,11 +279,11 @@ function applyTheme(theme, announceChange) {
 
 function updateThemeToggle(theme) {
   const modeLabel = themePreference === "system" ? `Auto (${capitalize(theme)})` : capitalize(theme);
-  const iconClass = themePreference === "system"
-    ? "fa-circle-half-stroke"
-    : theme === "dark" ? "fa-moon" : "fa-sun";
+  const iconName = themePreference === "system"
+    ? "contrast"
+    : theme === "dark" ? "moon" : "sun";
 
-  themeToggleIcon.className = `fa-solid ${iconClass}`;
+  themeToggleIcon.querySelector("use").setAttribute("href", `#i-${iconName}`);
   themeToggleButton.setAttribute("aria-label", `Theme: ${modeLabel}. Click to switch.`);
   themeToggleButton.setAttribute("title", `Theme: ${modeLabel}`);
 }
@@ -220,7 +315,7 @@ function renderSavedColors() {
   if (!savedColorStash.length) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
-    emptyState.innerHTML = `<i class="fa-solid fa-palette empty-state-icon" aria-hidden="true"></i>No saved colors yet. Preview a shade, then save the ones worth keeping.`;
+    emptyState.innerHTML = `<svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-palette"></use></svg>No saved colors yet. Preview a shade, then save the ones worth keeping.`;
     savedColorsEl.appendChild(emptyState);
     updateStashCount();
     return;
@@ -261,6 +356,15 @@ function createColorCard(color) {
     setStatus(`${formatHex(color)} loaded from your stash.`);
   });
 
+  hexLabel.addEventListener("click", () => copyText(formatHex(color)));
+  hexLabel.addEventListener("keydown", handleCopyableKeydown);
+  rgbLabel.addEventListener("click", () => copyText(hexToRgbString(color)));
+  rgbLabel.addEventListener("keydown", handleCopyableKeydown);
+  if (hslLabel) {
+    hslLabel.addEventListener("click", () => copyText(hexToHslString(color)));
+    hslLabel.addEventListener("keydown", handleCopyableKeydown);
+  }
+
   copyButton.addEventListener("click", async () => {
     await copyText(formatHex(color));
   });
@@ -273,25 +377,27 @@ function createColorCard(color) {
 }
 
 function deleteSavedColor(color, cardEl) {
-  if (cardEl) {
+  // Mutate + persist synchronously so rapid deletes never race on the animation callback.
+  savedColorStash = savedColorStash.filter((c) => c !== color);
+  persistColorStash();
+  updateStashCount();
+
+  if (cardEl && cardEl.isConnected) {
     cardEl.style.animation = "cardOut 180ms cubic-bezier(0.4, 0, 0.2, 1) both";
     cardEl.addEventListener("animationend", () => {
-      savedColorStash = savedColorStash.filter((c) => c !== color);
-      persistColorStash();
-      renderSavedColors();
+      cardEl.remove();
+      if (!savedColorStash.length) renderSavedColors();
     }, { once: true });
   } else {
-    savedColorStash = savedColorStash.filter((c) => c !== color);
-    persistColorStash();
     renderSavedColors();
   }
+
   showToast(`${formatHex(color)} removed.`, "success");
   setStatus(`${formatHex(color)} removed from your stash.`, "success");
 }
 
 function applyColor(color, syncInput = true) {
   const normalized = normalizeHex(color);
-  currentColor = normalized;
 
   if (syncInput) {
     colorInput.value = normalized;
@@ -317,6 +423,9 @@ function updatePreviewDisplay(color, labelColor, isValid) {
   if (isValid) {
     activeRgbLabel.textContent = hexToRgbString(color);
     if (activeHslLabel) activeHslLabel.textContent = hexToHslString(color);
+    updateContrast(color);
+    renderShades(color);
+    renderHarmonies(color);
   }
 }
 
@@ -335,7 +444,12 @@ function loadColorStash() {
 }
 
 function persistColorStash() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedColorStash));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedColorStash));
+  } catch {
+    showToast("Couldn't save — browser storage is full or blocked.", "error");
+    setStatus("Couldn't save to browser storage.", "error");
+  }
 }
 
 function sanitizeHex(value) {
@@ -380,11 +494,11 @@ function hexToRgbaString(color, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function hexToHslString(color) {
+function hexToHsl(color) {
   const n = normalizeHex(color);
-  let r = parseInt(n.slice(0, 2), 16) / 255;
-  let g = parseInt(n.slice(2, 4), 16) / 255;
-  let b = parseInt(n.slice(4, 6), 16) / 255;
+  const r = parseInt(n.slice(0, 2), 16) / 255;
+  const g = parseInt(n.slice(2, 4), 16) / 255;
+  const b = parseInt(n.slice(4, 6), 16) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -399,23 +513,262 @@ function hexToHslString(color) {
     else h = ((r - g) / delta + 4) / 6;
   }
 
-  return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+  return { h: h * 360, s, l };
+}
+
+function hexToHslString(color) {
+  const { h, s, l } = hexToHsl(color);
+  return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+}
+
+function hslToHex(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  let r = 0, g = 0, b = 0;
+  if (hp < 1) [r, g, b] = [c, x, 0];
+  else if (hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp < 3) [r, g, b] = [0, c, x];
+  else if (hp < 4) [r, g, b] = [0, x, c];
+  else if (hp < 5) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const m = l - c / 2;
+  const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0").toUpperCase();
+  return `${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/* ── Contrast (WCAG) ─────────────────────────── */
+
+function relativeLuminance(color) {
+  const n = normalizeHex(color);
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const channel = parseInt(n.slice(i, i + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(lumA, lumB) {
+  const lighter = Math.max(lumA, lumB);
+  const darker = Math.min(lumA, lumB);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function gradeForRatio(ratio) {
+  if (ratio >= 7) return { label: "AAA", tone: "pass" };
+  if (ratio >= 4.5) return { label: "AA", tone: "pass" };
+  if (ratio >= 3) return { label: "AA Large", tone: "" };
+  return { label: "Fail", tone: "fail" };
+}
+
+function updateContrast(color) {
+  const lum = relativeLuminance(color);
+  const versusLuminance = [1, 0]; // badge order: white, black
+  contrastRow.querySelectorAll(".contrast-badge").forEach((badge, index) => {
+    const ratio = contrastRatio(lum, versusLuminance[index]);
+    const grade = gradeForRatio(ratio);
+    badge.querySelector(".contrast-ratio").textContent = `${ratio.toFixed(2)}:1`;
+    const gradeEl = badge.querySelector(".contrast-grade");
+    gradeEl.textContent = grade.label;
+    gradeEl.classList.remove("pass", "fail");
+    if (grade.tone) gradeEl.classList.add(grade.tone);
+  });
+}
+
+/* ── Shades & tints ──────────────────────────── */
+
+function renderShades(color) {
+  const { h, s } = hexToHsl(color);
+  const currentHex = normalizeHex(color);
+  const fragment = document.createDocumentFragment();
+
+  SHADE_STOPS.forEach((lightness) => {
+    const shade = hslToHex(h, s, lightness);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "shade-swatch";
+    button.style.backgroundColor = `#${shade}`;
+    button.title = `#${shade}`;
+    button.setAttribute("aria-label", `Use #${shade}`);
+    if (shade === currentHex) button.classList.add("is-current");
+    button.addEventListener("click", () => {
+      colorInput.value = shade;
+      applyColor(shade);
+      setStatus(`#${shade} loaded from shades.`);
+    });
+    fragment.appendChild(button);
+  });
+
+  shadesRow.replaceChildren(fragment);
+}
+
+/* ── Harmonies ───────────────────────────────── */
+
+function renderHarmonies(color) {
+  const { h, s, l } = hexToHsl(color);
+  const fragment = document.createDocumentFragment();
+
+  HARMONIES.forEach(({ label, offset }) => {
+    const harmony = hslToHex(h + offset, s, l);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "harmony-swatch";
+    button.title = `${label} · #${harmony}`;
+    button.setAttribute("aria-label", `Use ${label} harmony #${harmony}`);
+
+    const chip = document.createElement("span");
+    chip.className = "harmony-chip";
+    chip.style.backgroundColor = `#${harmony}`;
+
+    const caption = document.createElement("span");
+    caption.className = "harmony-label";
+    caption.textContent = label;
+
+    button.append(chip, caption);
+    button.addEventListener("click", () => {
+      colorInput.value = harmony;
+      applyColor(harmony);
+      setStatus(`#${harmony} loaded from harmonies.`);
+    });
+    fragment.appendChild(button);
+  });
+
+  harmonyRow.replaceChildren(fragment);
+}
+
+/* ── EyeDropper ──────────────────────────────── */
+
+function setupEyeDropper() {
+  if (typeof window.EyeDropper !== "function") return;
+
+  eyeDropperButton.hidden = false;
+  eyeDropperButton.addEventListener("click", async () => {
+    try {
+      const result = await new window.EyeDropper().open();
+      const picked = sanitizeHex(result.sRGBHex);
+      colorInput.value = picked;
+      applyColor(picked);
+      setStatus("Color picked from screen. Save it if you like it.");
+    } catch {
+      // User dismissed the eyedropper — nothing to do.
+    }
+  });
+}
+
+/* ── Palette sharing (URL hash) ──────────────── */
+
+async function sharePalette() {
+  if (!savedColorStash.length) {
+    showToast("Save some colors first, then share them.");
+    setStatus("Save some colors first, then share them.");
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = savedColorStash.join(",");
+  window.history.replaceState(null, "", url.toString());
+
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    showToast(`Share link copied — ${savedColorStash.length} colors.`, "success");
+    setStatus("Shareable link copied to your clipboard.", "success");
+  } catch {
+    showToast("Link is in the address bar — copy it manually.", "error");
+    setStatus("Couldn't copy automatically; the link is in the address bar.", "error");
+  }
+}
+
+function importPaletteFromHash() {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (!hash) return null;
+
+  const incoming = hash.split(",").map(sanitizeHex).filter(isValidHex).map(normalizeHex);
+  // Always clear the hash so a refresh doesn't re-import the same palette.
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  if (!incoming.length) return null;
+
+  const merged = [...incoming, ...savedColorStash];
+  savedColorStash = merged.filter((color, index) => merged.indexOf(color) === index);
+  persistColorStash();
+  const label = `Imported ${incoming.length} shared color${incoming.length === 1 ? "" : "s"}.`;
+  showToast(label, "success");
+  setStatus(label, "success");
+  return incoming[0];
+}
+
+/* ── Export / import (JSON file) ─────────────── */
+
+function exportPalette() {
+  if (!savedColorStash.length) {
+    showToast("Save some colors first, then export them.");
+    setStatus("Save some colors first, then export them.");
+    return;
+  }
+
+  const payload = { generator: "Color Stash", colors: savedColorStash.map((color) => `#${color}`) };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "color-stash.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  showToast(`Exported ${savedColorStash.length} colors.`, "success");
+  setStatus(`Exported ${savedColorStash.length} colors to a file.`, "success");
+}
+
+function handleImportFile(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ""; // reset so the same file can be re-imported
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onerror = () => {
+    showToast("Couldn't read that file.", "error");
+    setStatus("Couldn't read that file.", "error");
+  };
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const list = Array.isArray(parsed) ? parsed : parsed.colors;
+      if (!Array.isArray(list)) throw new Error("missing colors array");
+
+      const incoming = list.map((value) => sanitizeHex(String(value))).filter(isValidHex).map(normalizeHex);
+      if (!incoming.length) {
+        showToast("No valid colors found in that file.", "error");
+        setStatus("No valid colors found in that file.", "error");
+        return;
+      }
+
+      const before = savedColorStash.length;
+      const merged = [...incoming, ...savedColorStash];
+      savedColorStash = merged.filter((color, index) => merged.indexOf(color) === index);
+      persistColorStash();
+      renderSavedColors();
+
+      const added = savedColorStash.length - before;
+      const label = `Imported ${added} new color${added === 1 ? "" : "s"}.`;
+      showToast(label, "success");
+      setStatus(label, "success");
+    } catch {
+      showToast("That file isn't a valid Color Stash export.", "error");
+      setStatus("That file isn't a valid Color Stash export.", "error");
+    }
+  };
+  reader.readAsText(file);
 }
 
 async function copyText(value) {
   try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(value);
-    } else {
-      colorInput.select();
-      document.execCommand("copy");
-      colorInput.setSelectionRange(colorInput.value.length, colorInput.value.length);
-    }
+    await navigator.clipboard.writeText(value);
     showToast(`${value} copied.`, "success");
     setStatus(`${value} copied to your clipboard.`, "success");
   } catch {
-    showToast("Copy failed. You can still copy manually.", "error");
-    setStatus("Copy failed in this browser. You can still copy manually.", "error");
+    showToast("Copy failed — you can copy it manually.", "error");
+    setStatus("Copy failed in this browser — you can copy it manually.", "error");
   }
 }
 
@@ -425,9 +778,7 @@ function setStatus(message, tone) {
   if (tone) statusMessage.classList.add(tone);
 }
 
-let toastQueue = [];
-
-function showToast(message, tone = "") {
+function showToast(message, tone = "", action = null) {
   const toast = document.createElement("div");
   toast.className = `toast${tone ? ` ${tone}` : ""}`;
 
@@ -436,18 +787,34 @@ function showToast(message, tone = "") {
   dot.setAttribute("aria-hidden", "true");
 
   const text = document.createElement("span");
+  text.className = "toast-text";
   text.textContent = message;
 
   toast.appendChild(dot);
   toast.appendChild(text);
-  toastContainer.appendChild(toast);
 
-  const timer = setTimeout(() => dismissToast(toast), 3000);
+  const timer = setTimeout(() => dismissToast(toast), action ? 6000 : 3000);
+
+  if (action) {
+    const actionButton = document.createElement("button");
+    actionButton.type = "button";
+    actionButton.className = "toast-action";
+    actionButton.textContent = action.label;
+    actionButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      clearTimeout(timer);
+      action.onClick();
+      dismissToast(toast);
+    });
+    toast.appendChild(actionButton);
+  }
 
   toast.addEventListener("click", () => {
     clearTimeout(timer);
     dismissToast(toast);
   });
+
+  toastContainer.appendChild(toast);
 }
 
 function dismissToast(toast) {
