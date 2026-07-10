@@ -1005,7 +1005,7 @@ p, h1, h2 { margin: 0; }
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  z-index: 100;
+  z-index: 1000; /* above the Hexle modal (200) so toasts stay visible */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1298,15 +1298,18 @@ p, h1, h2 { margin: 0; }
 }
 
 .hexle-result {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.9rem;
+  padding: 1rem;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--panel-2);
 }
 
 .hexle-result[hidden] { display: none; }
+
+.hexle-result-inner {
+  display: grid;
+  gap: 1rem;
+}
 
 .hexle-answer {
   display: flex;
@@ -1322,7 +1325,7 @@ p, h1, h2 { margin: 0; }
   flex-shrink: 0;
 }
 
-.hexle-answer-text { display: grid; gap: 0.1rem; }
+.hexle-answer-text { display: grid; gap: 0.2rem; }
 .hexle-answer-hex { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; }
 .hexle-answer-meta { font-size: 0.78rem; color: var(--muted); }
 
@@ -1332,7 +1335,14 @@ p, h1, h2 { margin: 0; }
   gap: 0.5rem;
 }
 
+.hexle-comeback {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .hexle-streak {
+  margin-top: 0.15rem;
   font-size: 0.8rem;
   color: var(--muted);
   text-align: center;
