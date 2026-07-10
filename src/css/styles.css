@@ -787,7 +787,7 @@ p, h1, h2 { margin: 0; }
 
 .shade-swatch:hover {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
   z-index: 1;
 }
 
@@ -824,7 +824,7 @@ p, h1, h2 { margin: 0; }
 
 .harmony-swatch:hover .harmony-chip {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
 
 .harmony-swatch .harmony-label {
@@ -844,28 +844,16 @@ p, h1, h2 { margin: 0; }
   gap: 0.5rem;
 }
 
+/* Inherits the ghost-button look (same as "Copy hex" / "Random"); slightly compact for the group header. */
 .image-extract-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: var(--button-bg);
-  color: var(--muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+  min-height: 32px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
 }
 
-.image-extract-button:hover {
-  background: var(--button-hover);
-  border-color: var(--line-strong);
-  color: var(--text);
-}
-
-.image-extract-button .icon { font-size: 0.95rem; }
+.image-extract-button .button-icon { font-size: 0.95rem; }
 
 .image-row {
   display: flex;
@@ -899,7 +887,7 @@ p, h1, h2 { margin: 0; }
 
 .image-swatch:hover .image-chip {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
 
 .image-swatch .image-label {
