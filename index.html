@@ -84,6 +84,11 @@
       <path d="m18 9 .4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4 3.4-3.4a1 1 0 1 1 3 3z" />
       <path d="m2 22 .414-.414" />
     </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24">
+      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </symbol>
   </svg>
 
   <main class="app-shell">
@@ -122,10 +127,30 @@
               aria-label="Export palette as a JSON file" title="Export JSON">
               <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
             </button>
-            <button id="exportCssButton" class="ghost-button icon-button" type="button"
-              aria-label="Copy palette as CSS custom properties" title="Copy as CSS">
-              <svg class="icon" aria-hidden="true"><use href="#i-braces"></use></svg>
-            </button>
+            <div class="menu-anchor">
+              <button id="exportCssButton" class="ghost-button icon-button" type="button"
+                aria-haspopup="true" aria-expanded="false" aria-controls="exportMenu"
+                aria-label="Export palette as developer tokens" title="Export as code">
+                <svg class="icon" aria-hidden="true"><use href="#i-braces"></use></svg>
+              </button>
+              <div id="exportMenu" class="export-menu" role="menu" aria-label="Export format" hidden>
+                <button class="export-menu-item" type="button" role="menuitem" data-format="css">
+                  <span>CSS variables</span><span class="hint">:root</span>
+                </button>
+                <button class="export-menu-item" type="button" role="menuitem" data-format="oklch">
+                  <span>CSS · OKLCH</span><span class="hint">oklch()</span>
+                </button>
+                <button class="export-menu-item" type="button" role="menuitem" data-format="scss">
+                  <span>SCSS variables</span><span class="hint">$var</span>
+                </button>
+                <button class="export-menu-item" type="button" role="menuitem" data-format="tailwind">
+                  <span>Tailwind config</span><span class="hint">colors</span>
+                </button>
+                <button class="export-menu-item" type="button" role="menuitem" data-format="tokens">
+                  <span>Design tokens</span><span class="hint">JSON</span>
+                </button>
+              </div>
+            </div>
             <button id="importColorsButton" class="ghost-button icon-button" type="button"
               aria-label="Import a palette from a JSON file" title="Import JSON">
               <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>
@@ -209,6 +234,20 @@
               <div class="harmony-group">
                 <span class="input-label">Harmonies</span>
                 <div id="harmonyRow" class="harmony-row"></div>
+              </div>
+
+              <div class="image-group">
+                <div class="image-group-header">
+                  <span class="input-label">From image</span>
+                  <button id="imageExtractButton" class="image-extract-button" type="button"
+                    aria-label="Extract a palette from an image">
+                    <svg class="icon" aria-hidden="true"><use href="#i-image"></use></svg>
+                    <span>Pick image</span>
+                  </button>
+                  <input id="imageFileInput" class="visually-hidden" type="file" accept="image/*"
+                    aria-hidden="true" tabindex="-1" />
+                </div>
+                <div id="imageRow" class="image-row" aria-live="polite"></div>
               </div>
 
               <div class="input-group">

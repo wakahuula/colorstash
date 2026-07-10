@@ -22,10 +22,14 @@ preview them live, and jump back to them instantly.
 - Shades & tints strip generated from the current color
 - Color harmonies (complementary, triadic, analogous), one click to apply
 - Eyedropper to pick any color on screen (where supported)
+- **Extract a palette from an image** — drop, paste, or pick a photo and its
+  dominant colors are read entirely on-device (canvas + median-cut); the image
+  is never uploaded
 - Save, name, reorder (drag), copy, and delete colors from a personal stash
 - Share a palette via a link (colors encoded in the URL hash)
-- Export / import your palette (with names) as a JSON file, or copy it as CSS
-  custom properties
+- Export / import your palette (with names) as a JSON file, or copy it as
+  developer tokens — **CSS variables, OKLCH, SCSS, Tailwind config, or W3C
+  design-token JSON**
 - Random color generator
 - Three-way theme toggle: system · dark · light
 - Toast notifications and smooth micro-animations (respects

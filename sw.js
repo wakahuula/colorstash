@@ -1,6 +1,6 @@
 // Color Stash service worker — cache-first, fully offline-capable.
 // IMPORTANT: bump CACHE_NAME on every deploy so clients pick up new assets.
-const CACHE_NAME = "colorstash-v1";
+const CACHE_NAME = "colorstash-v2";
 
 const PRECACHE_URLS = [
   "./",

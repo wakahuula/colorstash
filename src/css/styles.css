@@ -22,11 +22,35 @@
   --primary-bg: rgba(255, 255, 255, 0.1);
   --primary-hover: rgba(255, 255, 255, 0.15);
   --overlay: rgba(12, 12, 14, 0.6);
-  --radius: 12px;
+
+  /* ── Radius scale (systematic, DS-aligned) ── */
+  --radius-xs: 4px;
   --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ── Spacing scale (DS-aligned; use for new components) ── */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --current-color: #446ccf;
   --current-color-glow: rgba(68, 108, 207, 0.3);
+
+  /* ── Semantic status / feedback (dark values; light overrides below) ── */
+  --color-success: #4ade80;
+  --color-error: #f87171;
+  --color-warning: #fbbf24;
+  --color-info: #60a5fa;
+
   /* Elevation — dark theme: crisp shadow + subtle top highlight. */
   --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.4);
   --shadow-float: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 36px rgba(0, 0, 0, 0.5);
@@ -49,6 +73,13 @@
   --primary-bg: rgba(0, 0, 0, 0.08);
   --primary-hover: rgba(0, 0, 0, 0.12);
   --overlay: rgba(255, 255, 255, 0.56);
+
+  /* Status colors need darker, higher-contrast values on a light surface. */
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+  --color-warning: #d97706;
+  --color-info: #2563eb;
+
   /* Elevation — light theme: soft, layered, cool-neutral. No white inset (invisible on white). */
   --shadow-panel: 0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 12px rgba(17, 24, 39, 0.06);
   --shadow-float: 0 2px 6px rgba(17, 24, 39, 0.06), 0 12px 32px rgba(17, 24, 39, 0.12);
@@ -733,8 +764,8 @@ p, h1, h2 { margin: 0; }
   color: var(--muted);
 }
 
-.contrast-grade.pass { color: #4ade80; }
-.contrast-grade.fail { color: #f87171; }
+.contrast-grade.pass { color: var(--color-success); }
+.contrast-grade.fail { color: var(--color-error); }
 
 /* ── Shades / tints ──────────────────────────── */
 
@@ -800,6 +831,138 @@ p, h1, h2 { margin: 0; }
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   color: var(--muted);
+}
+
+/* ── Image → palette ─────────────────────────── */
+
+.image-group { display: grid; gap: 0.5rem; }
+
+.image-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.image-extract-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--button-bg);
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.image-extract-button:hover {
+  background: var(--button-hover);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.image-extract-button .icon { font-size: 0.95rem; }
+
+.image-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.image-row:empty::after {
+  content: "Drop, paste, or pick an image — its colors are read on your device and never uploaded.";
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.image-swatch {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: start;
+  padding: 0;
+  background: transparent;
+}
+
+.image-swatch .image-chip {
+  width: 3.4rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+
+.image-swatch:hover .image-chip {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-hover);
+}
+
+.image-swatch .image-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+/* Drag-and-drop target feedback on the whole preview panel. */
+.preview-panel.drop-active {
+  outline: 2px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: -10px;
+}
+
+:root[data-theme="light"] .preview-panel.drop-active {
+  outline-color: rgba(255, 255, 255, 0.9);
+}
+
+/* ── Export format menu ──────────────────────── */
+
+.menu-anchor { position: relative; }
+
+.export-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 40;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 190px;
+  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-float);
+  animation: cardIn 140ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.export-menu[hidden] { display: none; }
+
+.export-menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-align: left;
+  transition: background-color var(--transition);
+}
+
+.export-menu-item:hover { background: var(--button-hover); }
+
+.export-menu-item .hint {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
 }
 
 /* ── Utilities ───────────────────────────────── */
@@ -918,8 +1081,8 @@ p, h1, h2 { margin: 0; }
   background: var(--muted);
 }
 
-.toast.success .toast-dot { background: #4ade80; }
-.toast.error .toast-dot { background: #f87171; }
+.toast.success .toast-dot { background: var(--color-success); }
+.toast.error .toast-dot { background: var(--color-error); }
 
 .toast-text { flex: 1; }
 

@@ -63,6 +63,35 @@ Status-Legende: ✅ erledigt · ⬜ offen
 
 ---
 
+## Design-System-Angleichung & Sticky-Features (Stand 2026-07-10)
+
+Ziel: colorstash professioneller wirken lassen — die **Systematik** des Aeneis
+Design Systems (`C:\Dev\workspaces\DesignSystem`) übernehmen, **ohne** die eigene
+Identität (dark-first, Glass, akzentfarbe = die *aktuell gewählte* Farbe) aufzugeben.
+Das corporate Orange/Geist/Flat-Branding wäre für ein Farbwerkzeug ein Rückschritt —
+übernommen wird die *Disziplin*, nicht das Branding.
+
+| Status | Punkt | Ort |
+|--------|-------|-----|
+| ✅ | Semantische **Status-Farb-Familie** (`--color-success/-error/-warning/-info`, Light+Dark getrennt) statt hartkodierter `#4ade80`/`#f87171` — angewandt auf Kontrast-Grades & Toast-Dots | `styles.css` |
+| ✅ | Systematische **Radius-** (`--radius-xs/-sm/-/-lg/-pill`) und **Spacing-Skala** (`--space-2 … -24`) als Token-Ebene (DS-analog) | `styles.css` |
+| ✅ | **Bild → Palette** (Fable-Feature #2): Bild droppen/einfügen/auswählen → dominante Farben werden **komplett on-device** extrahiert (Canvas-Downsample + Median-Cut, nach Luminanz sortiert), 1 Klick in den Input. Kein Upload — Privacy als Alleinstellung. Drag/Drop auf die Preview + globales Paste (Ctrl+V) | `index.html`, `styles.css`, `main.js` |
+| ✅ | **Dev-Export-Pack** (Fable-Feature #5): der `{}`-Button öffnet ein Format-Menü — CSS-Variablen, **OKLCH**, SCSS, **Tailwind-Config**, **W3C-Design-Tokens (JSON)**. Namen werden zu Token-Slugs (dedupliziert, Fallback `color-N`) | `index.html`, `styles.css`, `main.js` |
+
+**Fable-Brief — Sticky-Features-Roadmap (noch offen, priorisiert):**
+
+| Prio | Feature | Pitch | Constraint |
+|------|---------|-------|------------|
+| ⬜ 1 | **Hexle** — tägliches Farb-Rätsel | Seeded per `YYYY-MM-DD` (kein Server), 3 Versuche, ΔE2000-Score, Streak + Wordle-artiges Emoji-Share | erzeugt *tägliche* Frequenz; 100% client-side |
+| ⬜ 3 | **Projekte** (mehrere Stashes) + optional File-Sync | IndexedDB je Projekt; File System Access API → an `tokens.json` im echten Repo koppeln | Data-Gravity; Chromium-only, degradiert sauber |
+| ⬜ 4 | **Palette-A11y-Report** | N×N-Kontrast-Matrix des ganzen Stash + CVD-Simulation (Farbenblindheit, LMS-Matrizen) | reine Mathematik; baut auf vorhandenem WCAG-Code |
+| ⬜ D | **Palette-Karte als PNG** (Signature) | „Share as image": Stash auf Canvas rendern (Swatches, Namen, Hex, Watermark) → der virale Kanal eines statischen Tools | Canvas + Blob / Web Share |
+| ⬜ D | **Hex o'clock** / **Stash Wrapped** (Signature) | Ambient-Modus (Uhrzeit = Farbe); jährlicher lokaler Rückblick | client-side, screenshot-tauglich |
+| ⬜ 🎲 | **Live Theme Lab** (Bold Bet) | Bookmarklet: Palette einer beliebigen Seite ernten *und* die Seite live mit dem eigenen Stash umfärben | self-contained JS, Rückgabe via URL-Hash |
+| ⬜ | **PWA `share_target`** für Bilder | Foto aus der Handy-Galerie direkt in colorstash teilen → speist „Bild → Palette" | `manifest.json` + Launch-Handling; ergänzt das umgesetzte Feature |
+
+---
+
 ## Bug-Register (aus Code-Review)
 
 | # | Ort | Problem | Status |
