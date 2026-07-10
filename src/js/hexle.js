@@ -19,6 +19,7 @@ const hexleTries = document.getElementById("hexleTries");
 const hexleOptions = document.getElementById("hexleOptions");
 const hexleResult = document.getElementById("hexleResult");
 const hexleStreak = document.getElementById("hexleStreak");
+const hexleAutoOpen = document.getElementById("hexleAutoOpen");
 
 let hexleState = loadHexleState();
 let hexleTarget = null;      // today's answer (6-digit hex, no #)
@@ -130,12 +131,14 @@ function loadHexleState() {
         streak: Number.isFinite(parsed.streak) ? parsed.streak : 0,
         maxStreak: Number.isFinite(parsed.maxStreak) ? parsed.maxStreak : 0,
         lastWonDate: typeof parsed.lastWonDate === "string" ? parsed.lastWonDate : null,
+        autoOpen: parsed.autoOpen !== false, // default on
+        autoOpenedDate: typeof parsed.autoOpenedDate === "string" ? parsed.autoOpenedDate : null,
       };
     }
   } catch {
     // Corrupt/blocked storage — start fresh.
   }
-  return { date: null, picks: [], done: false, won: false, streak: 0, maxStreak: 0, lastWonDate: null };
+  return { date: null, picks: [], done: false, won: false, streak: 0, maxStreak: 0, lastWonDate: null, autoOpen: true, autoOpenedDate: null };
 }
 
 function persistHexleState() {
@@ -200,6 +203,7 @@ function hexleEffectiveStreak() {
 function openHexle() {
   hexleEnsureToday();
   hexleRender();
+  hexleAutoOpen.checked = hexleState.autoOpen;
   hexleModal.hidden = false;
   const firstOption = hexleOptions.querySelector("button:not([disabled])");
   (firstOption || hexleModal.querySelector("[data-hexle-close]")).focus();
@@ -361,6 +365,15 @@ function hexleUpdateLaunch() {
   }
 }
 
+// Opens once per day on first visit — only if today's puzzle is unplayed and auto-open is on.
+function maybeAutoOpenHexle() {
+  if (!hexleState.autoOpen || hexleState.done) return;
+  if (hexleState.autoOpenedDate === hexleToday()) return;
+  hexleState.autoOpenedDate = hexleToday();
+  persistHexleState();
+  openHexle();
+}
+
 /* ── Wiring ──────────────────────────────────── */
 
 hexleButton.addEventListener("click", openHexle);
@@ -368,6 +381,12 @@ hexleModal.querySelectorAll("[data-hexle-close]").forEach((el) => el.addEventLis
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !hexleModal.hidden) closeHexle();
 });
+hexleAutoOpen.addEventListener("change", () => {
+  hexleState.autoOpen = hexleAutoOpen.checked;
+  persistHexleState();
+});
 
 hexleEnsureToday();
+hexleAutoOpen.checked = hexleState.autoOpen;
 hexleUpdateLaunch();
+maybeAutoOpenHexle();

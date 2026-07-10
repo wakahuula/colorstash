@@ -1348,6 +1348,23 @@ p, h1, h2 { margin: 0; }
   text-align: center;
 }
 
+.hexle-autoopen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.hexle-autoopen input {
+  width: 0.95rem;
+  height: 0.95rem;
+  accent-color: var(--current-color);
+  cursor: pointer;
+}
+
 /* ── Responsive ──────────────────────────────── */
 
 @media (max-width: 1100px) {
