@@ -6,7 +6,7 @@
 // persistColorStash, renderSavedColors, showToast, setStatus.
 
 const HEXLE_KEY = "hexleState";
-const HEXLE_EPOCH_UTC = Date.UTC(2026, 0, 1);
+const HEXLE_EPOCH_UTC = Date.UTC(2026, 6, 10); // launch day = Hexle #1 (2026-07-10)
 const HEXLE_MAX_WRONG = 3;
 const HEXLE_OPTIONS = 5;
 
