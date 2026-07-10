@@ -31,6 +31,9 @@ preview them live, and jump back to them instantly.
   developer tokens — **CSS variables, OKLCH, SCSS, Tailwind config, or W3C
   design-token JSON**
 - Random color generator
+- **Hexle** — a daily color guess: everyone gets the same mystery color (seeded
+  from the date, no server), pick its hex from five options, three wrong guesses
+  lose the day. Streaks and a Wordle-style shareable result
 - Three-way theme toggle: system · dark · light
 - Toast notifications and smooth micro-animations (respects
   `prefers-reduced-motion`)
@@ -54,10 +57,17 @@ index.html               # markup, document head, inline SVG icon sprite
 manifest.json            # PWA manifest
 sw.js                    # service worker (cache-first, offline)
 src/css/styles.css       # all styling (custom-property theming)
-src/js/main.js           # all behaviour (vanilla JS)
+src/js/main.js           # core app + shared color helpers (vanilla JS)
+src/js/export-pack.js    # feature: developer token export menu
+src/js/image-palette.js  # feature: on-device image → palette extraction
+src/js/hexle.js          # feature: the daily Hexle game
 src/assets/fonts/        # self-hosted JetBrains Mono (woff2)
 src/assets/icons/        # PWA / app icons (PNG)
 ```
+
+Each feature lives in its own file. They load as plain `<script defer>` after
+`main.js` (no build step, no modules — so opening `index.html` over `file://`
+still works) and share `main.js`'s global color helpers.
 
 Icons are an inline SVG sprite (from [Lucide](https://lucide.dev), ISC) and the
 font is self-hosted — so the app makes **zero external network requests**.

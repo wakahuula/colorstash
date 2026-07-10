@@ -1,6 +1,6 @@
 // Color Stash service worker — cache-first, fully offline-capable.
 // IMPORTANT: bump CACHE_NAME on every deploy so clients pick up new assets.
-const CACHE_NAME = "colorstash-v2";
+const CACHE_NAME = "colorstash-v3";
 
 const PRECACHE_URLS = [
   "./",
@@ -8,6 +8,9 @@ const PRECACHE_URLS = [
   "./manifest.json",
   "./src/css/styles.css",
   "./src/js/main.js",
+  "./src/js/export-pack.js",
+  "./src/js/image-palette.js",
+  "./src/js/hexle.js",
   "./src/assets/fonts/jetbrains-mono-latin.woff2",
   "./src/assets/icons/icon-192.png",
   "./src/assets/icons/icon-512.png",

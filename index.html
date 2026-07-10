@@ -23,7 +23,11 @@
   <link rel="icon"
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0d'/%3E%3Ccircle cx='16' cy='16' r='8' fill='%23446ccf'/%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" href="./src/assets/icons/apple-touch-icon.png" />
+  <!-- main.js defines the core app + shared color helpers; feature files load after and self-init. -->
   <script src="./src/js/main.js" defer></script>
+  <script src="./src/js/export-pack.js" defer></script>
+  <script src="./src/js/image-palette.js" defer></script>
+  <script src="./src/js/hexle.js" defer></script>
   <title>Color Stash</title>
 </head>
 
@@ -89,6 +93,12 @@
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
     </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24">
+      <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+    </symbol>
   </svg>
 
   <main class="app-shell">
@@ -109,6 +119,14 @@
           <p class="shortcut-hint">
             <kbd>S</kbd> save · <kbd>C</kbd> copy · <kbd>R</kbd> random
           </p>
+          <button id="hexleButton" class="hexle-launch" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg>
+            <span class="hexle-launch-text">
+              <span class="hexle-launch-title">Play today's Hexle</span>
+              <span class="hexle-launch-sub">Guess the daily color's hex</span>
+            </span>
+            <span id="hexleStreakBadge" class="hexle-streak-badge" hidden></span>
+          </button>
         </div>
       </section>
 
@@ -289,6 +307,33 @@
       </div>
     </section>
   </main>
+
+  <div id="hexleModal" class="hexle-modal" role="dialog" aria-modal="true" aria-labelledby="hexleTitle" hidden>
+    <div class="hexle-backdrop" data-hexle-close></div>
+    <div class="hexle-dialog" role="document">
+      <div class="hexle-header">
+        <div class="hexle-header-text">
+          <span class="eyebrow">Daily color guess</span>
+          <h2 id="hexleTitle">Hexle <span id="hexleNumber"></span></h2>
+        </div>
+        <button class="hexle-close icon-button" type="button" data-hexle-close aria-label="Close Hexle">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+
+      <p id="hexleInstructions" class="hexle-instructions">Which hex code is this color? Three wrong guesses and the day is lost.</p>
+
+      <div id="hexleSwatch" class="hexle-swatch" aria-label="Today's mystery color"></div>
+
+      <div id="hexleTries" class="hexle-tries" aria-label="Guesses remaining"></div>
+
+      <div id="hexleOptions" class="hexle-options" role="group" aria-label="Hex code options" aria-live="polite"></div>
+
+      <div id="hexleResult" class="hexle-result" hidden></div>
+
+      <p id="hexleStreak" class="hexle-streak"></p>
+    </div>
+  </div>
 
   <!-- Toasts are the visual channel only; #statusMessage (aria-live) is the single screen-reader announcer. -->
   <div id="toastContainer" class="toast-container" aria-hidden="true"></div>

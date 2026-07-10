@@ -1104,6 +1104,252 @@ p, h1, h2 { margin: 0; }
   border-color: var(--line-strong);
 }
 
+/* ── Hexle (daily color guess) ───────────────── */
+
+.hexle-launch {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--button-bg);
+  color: var(--text);
+  text-align: left;
+  transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.hexle-launch:hover {
+  background: var(--button-hover);
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px var(--current-color-glow);
+}
+
+.hexle-launch > .icon {
+  font-size: 1.15rem;
+  color: var(--current-color);
+  flex-shrink: 0;
+}
+
+.hexle-launch-text {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.hexle-launch-title { font-size: 0.9rem; font-weight: 700; }
+.hexle-launch-sub { font-size: 0.74rem; color: var(--muted); }
+
+.hexle-streak-badge {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hexle-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.hexle-modal[hidden] { display: none; }
+
+.hexle-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: hexleFade 160ms ease both;
+}
+
+@keyframes hexleFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hexle-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-3);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--shadow-float);
+  animation: hexlePop 180ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes hexlePop {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.hexle-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hexle-header h2 {
+  margin-top: 0.15rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.hexle-header h2 span { color: var(--muted); font-weight: 700; }
+
+.hexle-close {
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--button-bg);
+  color: var(--muted);
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.hexle-close:hover {
+  background: var(--button-hover);
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.hexle-instructions {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.hexle-swatch {
+  height: 120px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-hover);
+}
+
+.hexle-tries {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.hexle-try-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+
+.hexle-try-dot.spent {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.hexle-options {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.hexle-option {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--button-bg);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition), opacity var(--transition);
+}
+
+.hexle-option:not(:disabled):hover {
+  background: var(--button-hover);
+  border-color: var(--line-strong);
+}
+
+.hexle-option:disabled { cursor: default; }
+
+.hexle-option.wrong {
+  border-color: var(--color-error);
+  color: var(--muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.hexle-option.correct {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.35);
+  color: var(--text);
+  opacity: 1;
+}
+
+.hexle-result {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.hexle-result[hidden] { display: none; }
+
+.hexle-answer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hexle-answer-swatch {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.hexle-answer-text { display: grid; gap: 0.1rem; }
+.hexle-answer-hex { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.04em; }
+.hexle-answer-meta { font-size: 0.78rem; color: var(--muted); }
+
+.hexle-result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.hexle-streak {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
 /* ── Responsive ──────────────────────────────── */
 
 @media (max-width: 1100px) {
