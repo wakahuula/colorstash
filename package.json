@@ -1,0 +1,8 @@
+{
+  "name": "colorstash",
+  "private": true,
+  "description": "Static color tool. No build step, no runtime dependencies. This file only exists so `npm test` can run the color maths tests.",
+  "scripts": {
+    "test": "node --test tests/color.test.js"
+  }
+}

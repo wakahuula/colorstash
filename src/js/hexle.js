@@ -1,9 +1,12 @@
-// Color Stash — Hexle, the daily color guess.
+// Color Stash: Hexle, the daily color guess.
 // Everyone gets the same mystery color each day (seeded from the date, no server).
 // Read the color, then pick its hex from five options. Three wrong guesses lose the day.
-// Loaded as a classic <script defer> after main.js, so it shares main.js's globals:
-// hslToHex, normalizeHex, isValidHex, formatHex, savedColorStash,
-// persistColorStash, renderSavedColors, showToast, setStatus.
+//
+// Loaded as a classic <script defer> after main.js. Dependencies come from the
+// window.ColorStash contract rather than from bare globals.
+// Destructuring into bare names does NOT work: classic scripts share one global
+// scope, so `const { showToast } = …` collides with main.js and throws.
+
 
 const HEXLE_KEY = "hexleState";
 const HEXLE_EPOCH_UTC = Date.UTC(2026, 6, 10); // launch day = Hexle #1 (2026-07-10)
@@ -56,7 +59,7 @@ function hexleHash(str) {
   return h >>> 0;
 }
 
-// mulberry32 PRNG — deterministic, so every device builds the same puzzle.
+// mulberry32 PRNG, deterministic, so every device builds the same puzzle.
 function hexleRng(seed) {
   let a = seed >>> 0;
   return function () {
@@ -75,9 +78,9 @@ function hexleClamp01(value) {
 function hexleBuildPuzzle(dateStr) {
   const rng = hexleRng(hexleHash(`hexle-${dateStr}`));
   const h = Math.floor(rng() * 360);
-  const s = 0.45 + rng() * 0.4; // 0.45–0.85
-  const l = 0.35 + rng() * 0.3; // 0.35–0.65
-  const target = hslToHex(h, s, l);
+  const s = 0.45 + rng() * 0.4; // 0.45 to 0.85
+  const l = 0.35 + rng() * 0.3; // 0.35 to 0.65
+  const target = ColorStash.hslToHex(h, s, l);
 
   const choices = new Set([target]);
   const offsets = [
@@ -87,13 +90,13 @@ function hexleBuildPuzzle(dateStr) {
   ];
   for (let i = 0; i < offsets.length && choices.size < HEXLE_OPTIONS; i++) {
     const [dh, ds, dl] = offsets[i];
-    choices.add(hslToHex(h + dh, hexleClamp01(s + ds), hexleClamp01(l + dl)));
+    choices.add(ColorStash.hslToHex(h + dh, hexleClamp01(s + ds), hexleClamp01(l + dl)));
   }
   while (choices.size < HEXLE_OPTIONS) {
-    choices.add(hslToHex(Math.floor(rng() * 360), 0.4 + rng() * 0.45, 0.3 + rng() * 0.4));
+    choices.add(ColorStash.hslToHex(Math.floor(rng() * 360), 0.4 + rng() * 0.45, 0.3 + rng() * 0.4));
   }
 
-  // Seeded Fisher–Yates: option order is stable and identical for everyone.
+  // Seeded Fisher-Yates: option order is stable and identical for everyone.
   const arr = [...choices];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -125,7 +128,9 @@ function loadHexleState() {
     if (parsed && typeof parsed === "object") {
       return {
         date: typeof parsed.date === "string" ? parsed.date : null,
-        picks: Array.isArray(parsed.picks) ? parsed.picks.filter(isValidHex).map(normalizeHex) : [],
+        picks: Array.isArray(parsed.picks)
+          ? parsed.picks.filter(ColorStash.isValidHex).map(ColorStash.normalizeHex)
+          : [],
         done: !!parsed.done,
         won: !!parsed.won,
         streak: Number.isFinite(parsed.streak) ? parsed.streak : 0,
@@ -136,7 +141,7 @@ function loadHexleState() {
       };
     }
   } catch {
-    // Corrupt/blocked storage — start fresh.
+    // Corrupt/blocked storage, start fresh.
   }
   return { date: null, picks: [], done: false, won: false, streak: 0, maxStreak: 0, lastWonDate: null, autoOpen: true, autoOpenedDate: null };
 }
@@ -145,7 +150,7 @@ function persistHexleState() {
   try {
     localStorage.setItem(HEXLE_KEY, JSON.stringify(hexleState));
   } catch {
-    // Non-fatal — the game still works for this session.
+    // Non-fatal, the game still works for this session.
   }
 }
 
@@ -201,17 +206,17 @@ function hexleEffectiveStreak() {
 /* ── Rendering ───────────────────────────────── */
 
 function openHexle() {
+  if (hexleModal.open) return;
   hexleEnsureToday();
   hexleRender();
   hexleAutoOpen.checked = hexleState.autoOpen;
-  hexleModal.hidden = false;
+  hexleModal.showModal();
   const firstOption = hexleOptions.querySelector("button:not([disabled])");
   (firstOption || hexleModal.querySelector("[data-hexle-close]")).focus();
 }
 
 function closeHexle() {
-  hexleModal.hidden = true;
-  hexleButton.focus();
+  if (hexleModal.open) hexleModal.close();
 }
 
 function hexleRender() {
@@ -226,6 +231,8 @@ function hexleRender() {
     tries.appendChild(dot);
   }
   hexleTries.replaceChildren(tries);
+  // The dots encode the count visually; name it for everyone else.
+  hexleTries.setAttribute("aria-label", `${HEXLE_MAX_WRONG - wrong} of ${HEXLE_MAX_WRONG} guesses remaining`);
 
   const options = document.createDocumentFragment();
   hexleChoices.forEach((hex) => {
@@ -283,8 +290,8 @@ function hexleBuildResult() {
   meta.className = "hexle-answer-meta";
   const picks = hexleState.picks.length;
   meta.textContent = hexleState.won
-    ? `Solved in ${picks} ${picks === 1 ? "guess" : "guesses"} 🎉`
-    : "Out of guesses — better luck tomorrow.";
+    ? `Solved in ${picks} ${picks === 1 ? "guess" : "guesses"}.`
+    : "Out of guesses.";
   text.append(hex, meta);
   answer.append(swatch, text);
 
@@ -304,12 +311,7 @@ function hexleBuildResult() {
   saveButton.addEventListener("click", saveHexleColor);
 
   actions.append(shareButton, saveButton);
-
-  const comeback = document.createElement("p");
-  comeback.className = "hexle-comeback";
-  comeback.textContent = `Come back tomorrow for Hexle #${hexlePuzzleNumber(hexleState.date) + 1}.`;
-
-  wrap.append(answer, actions, comeback);
+  wrap.append(answer, actions);
   return wrap;
 }
 
@@ -329,30 +331,29 @@ async function shareHexle() {
       await navigator.share({ text });
       return;
     } catch {
-      // User dismissed the share sheet, or it failed — fall back to the clipboard.
+      // User dismissed the share sheet, or it failed. Fall back to the clipboard.
     }
   }
   try {
     await navigator.clipboard.writeText(text);
-    showToast("Result copied to your clipboard.", "success");
-    setStatus("Hexle result copied to your clipboard.", "success");
+    ColorStash.showToast("Result copied to your clipboard.", "success");
+    ColorStash.setStatus("Hexle result copied to your clipboard.", "success");
   } catch {
-    showToast("Couldn't copy the result.", "error");
-    setStatus("Couldn't copy the result.", "error");
+    ColorStash.showToast("Couldn't copy the result.", "error");
+    ColorStash.setStatus("Couldn't copy the result.", "error");
   }
 }
 
 function saveHexleColor() {
-  if (savedColorStash.some((entry) => entry.hex === hexleTarget)) {
-    showToast(`${formatHex(hexleTarget)} is already in your stash.`);
-    setStatus(`${formatHex(hexleTarget)} is already in your stash.`);
+  const current = ColorStash.stash;
+  if (current.some((entry) => entry.hex === hexleTarget)) {
+    ColorStash.showToast(`${ColorStash.formatHex(hexleTarget)} is already in your stash.`);
+    ColorStash.setStatus(`${ColorStash.formatHex(hexleTarget)} is already in your stash.`);
     return;
   }
-  savedColorStash.unshift({ hex: hexleTarget, name: `Hexle #${hexlePuzzleNumber(hexleState.date)}` });
-  persistColorStash();
-  renderSavedColors();
-  showToast(`Saved ${formatHex(hexleTarget)} to your stash.`, "success");
-  setStatus(`Saved ${formatHex(hexleTarget)} to your stash.`, "success");
+  ColorStash.addSavedColor({ hex: hexleTarget, name: `Hexle #${hexlePuzzleNumber(hexleState.date)}` });
+  ColorStash.showToast(`Saved ${ColorStash.formatHex(hexleTarget)} to your stash.`, "success");
+  ColorStash.setStatus(`Saved ${ColorStash.formatHex(hexleTarget)} to your stash.`, "success");
 }
 
 function hexleUpdateLaunch() {
@@ -365,7 +366,7 @@ function hexleUpdateLaunch() {
   }
 }
 
-// Opens once per day on first visit — only if today's puzzle is unplayed and auto-open is on.
+// Opens once per day on first visit, only if today's puzzle is unplayed and auto-open is on.
 function maybeAutoOpenHexle() {
   if (!hexleState.autoOpen || hexleState.done) return;
   if (hexleState.autoOpenedDate === hexleToday()) return;
@@ -378,8 +379,13 @@ function maybeAutoOpenHexle() {
 
 hexleButton.addEventListener("click", openHexle);
 hexleModal.querySelectorAll("[data-hexle-close]").forEach((el) => el.addEventListener("click", closeHexle));
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !hexleModal.hidden) closeHexle();
+// A modal dialog's backdrop dispatches its clicks to the dialog element itself,
+// so a click landing on the dialog rather than on the content means "outside".
+hexleModal.addEventListener("click", (event) => {
+  if (event.target === hexleModal) closeHexle();
+});
+hexleModal.addEventListener("close", () => {
+  if (document.activeElement === document.body) hexleButton.focus();
 });
 hexleAutoOpen.addEventListener("change", () => {
   hexleState.autoOpen = hexleAutoOpen.checked;

@@ -1,0 +1,7 @@
+# Local notes
+#
+# This folder holds working analysis and planning documents that are not part of
+# the shipped site. It is intentionally untracked: the app is deployed straight
+# from the repo as static files, and none of this belongs in that output.
+
+.docs/

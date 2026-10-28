@@ -1,14 +1,14 @@
-# Color Stash — Verbesserungs-Backlog
+# Color Stash: Verbesserungs-Backlog
 
 Analyse & Priorisierung (Stand 2026-07-07). Leitplanke bei **jedem** Punkt:
-Die App bleibt **lightweight & statisch** — Vanilla-JS, kein Build-Step, weiterhin
+Die App bleibt **lightweight & statisch**: Vanilla-JS, kein Build-Step, weiterhin
 als reine Dateien via GitHub Pages / Glitch deploybar.
 
 Status-Legende: ✅ erledigt · ⬜ offen
 
 ---
 
-## Tier 1 — Quick Wins (Minuten)
+## Tier 1: Quick Wins (Minuten)
 
 | Status | Punkt | Ort |
 |--------|-------|-----|
@@ -23,7 +23,7 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | Klick auf RGB-/HSL-Label kopiert im jeweiligen Format (waren tote Anzeige) | `main.js` / `index.html` |
 | ✅ | README mit Screenshot-Platzhalter, Feature-Liste, Selling Points füllen; „PWA"-Behauptung vorerst raus | `README.md` |
 
-## Tier 2 — Mittel (je 1–3 h)
+## Tier 2: Mittel (je 1 bis 3 h)
 
 | Status | Punkt | Nutzen |
 |--------|-------|--------|
@@ -32,7 +32,7 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | Palette teilen via URL-Hash (`#446CCF,FF6B35,…`) + Share-Button; Import beim Laden mergt & löscht den Hash | Sozial/verlinkbar, kein Backend |
 | ✅ | Shades/Tints-Leiste unter der Preview (9 klickbare Abstufungen) | „Designer-Tool"-Eindruck |
 | ✅ | EyeDropper-API-Button (feature-detected, degradiert sauber) | Farbe vom Bildschirm picken |
-| ✅ | Font Awesome durch Inline-SVG-Sprite (10 Lucide-Icons, ISC) ersetzen + JetBrains Mono self-hosten (1 variable woff2, 31 KB, deckt 400–800 ab) | **Null externe Requests** → wirklich lightweight, DSGVO-sauber, offline |
+| ✅ | Font Awesome durch Inline-SVG-Sprite (10 Lucide-Icons, ISC) ersetzen + JetBrains Mono self-hosten (1 variable woff2, 31 KB, deckt 400 bis 800 ab) | **Null externe Requests** → wirklich lightweight, DSGVO-sauber, offline |
 | ✅ | Undo-Toast für „Clear all" (6s-Snapshot, Action-Button) statt destruktivem Ein-Klick-Löschen | Datenschutz vor Fehlklick |
 | ✅ | Keyboard-Shortcuts (`S`/`C`/`R`) + Hint im Intro-Panel; ignoriert Eingabe in Feldern | Power-User-Feel |
 | ✅ | `execCommand`-Clipboard-Fallback entfernt (reine `navigator.clipboard`-API) | Fixt Copy-falsche-Farbe-Bug bei Stash-Karten |
@@ -40,14 +40,14 @@ Status-Legende: ✅ erledigt · ⬜ offen
 | ✅ | Doppelte Screenreader-Ansagen behoben: Toast-Container `aria-hidden`, `#statusMessage` (polite) ist alleinige Live-Region | a11y |
 | ✅ | `↑/↓` durch den Stash navigieren (Fokus wandert zwischen den Swatches) | Power-User-Feel |
 
-## Tier 3 — Größer (halber Tag+)
+## Tier 3: Größer (halber Tag+)
 
 | Status | Punkt | Hinweis zur Lightweight-Constraint |
 |--------|-------|-----------------------------------|
 | ✅ | Echte PWA: `manifest.json` + Cache-First-Service-Worker (`sw.js`) + PNG-Icons (192/512, „any maskable" + Apple-Touch); offline verifiziert | Bleibt 100% statisch/GitHub-Pages-tauglich; **Sorgfaltspflicht**: `CACHE_NAME` in `sw.js` bei jedem Deploy hochzählen |
 | ✅ | Export/Import JSON (Blob-Download + FileReader; Import validiert, mergt, dedupliziert) | Reines Blob-Download/FileReader, kein Backend |
 | ✅ | Farb-Harmonien (Komplementär/Triade/Analog) als klickbare, beschriftete Chips | Vanilla-Mathe |
-| ✅ | CSS-Variables-Export der Palette (`:root { --color-1: … }`, Namen als Kommentare) — kopiert in die Zwischenablage | Ergänzung zum JSON-Export |
+| ✅ | CSS-Variables-Export der Palette (`:root { --color-1: … }`, Namen als Kommentare), kopiert in die Zwischenablage | Ergänzung zum JSON-Export |
 | ✅ | Benannte Farben pro Farbe (Inline-Namensfeld je Karte); Namen in Export/Import erhalten | Datenmodell `string[]` → `{hex, name}[]`; rückwärtskompatible LocalStorage-Migration (alte Daten & Share-Links) |
 | ✅ | Drag-to-reorder (native HTML5-DnD, keine Lib, Insert-Indikator) | Desktop-Feature; Touch-DnD bleibt eingeschränkt (bewusst keine Lib, um lightweight zu bleiben) |
 
@@ -65,22 +65,22 @@ Status-Legende: ✅ erledigt · ⬜ offen
 
 ## Design-System-Angleichung & Sticky-Features (Stand 2026-07-10)
 
-Ziel: colorstash professioneller wirken lassen — die **Systematik** des Aeneis
+Ziel: colorstash professioneller wirken lassen: die **Systematik** des Aeneis
 Design Systems (`C:\Dev\workspaces\DesignSystem`) übernehmen, **ohne** die eigene
 Identität (dark-first, Glass, akzentfarbe = die *aktuell gewählte* Farbe) aufzugeben.
-Das corporate Orange/Geist/Flat-Branding wäre für ein Farbwerkzeug ein Rückschritt —
+Das corporate Orange/Geist/Flat-Branding wäre für ein Farbwerkzeug ein Rückschritt.
 übernommen wird die *Disziplin*, nicht das Branding.
 
 | Status | Punkt | Ort |
 |--------|-------|-----|
-| ✅ | Semantische **Status-Farb-Familie** (`--color-success/-error/-warning/-info`, Light+Dark getrennt) statt hartkodierter `#4ade80`/`#f87171` — angewandt auf Kontrast-Grades & Toast-Dots | `styles.css` |
+| ✅ | Semantische **Status-Farb-Familie** (`--color-success/-error/-warning/-info`, Light+Dark getrennt) statt hartkodierter `#4ade80`/`#f87171`, angewandt auf Kontrast-Grades & Toast-Dots | `styles.css` |
 | ✅ | Systematische **Radius-** (`--radius-xs/-sm/-/-lg/-pill`) und **Spacing-Skala** (`--space-2 … -24`) als Token-Ebene (DS-analog) | `styles.css` |
-| ✅ | **Bild → Palette** (Fable-Feature #2): Bild droppen/einfügen/auswählen → dominante Farben werden **komplett on-device** extrahiert (Canvas-Downsample + Median-Cut, nach Luminanz sortiert), 1 Klick in den Input. Kein Upload — Privacy als Alleinstellung. Drag/Drop auf die Preview + globales Paste (Ctrl+V) | `index.html`, `styles.css`, `main.js` |
-| ✅ | **Dev-Export-Pack** (Fable-Feature #5): der `{}`-Button öffnet ein Format-Menü — CSS-Variablen, **OKLCH**, SCSS, **Tailwind-Config**, **W3C-Design-Tokens (JSON)**. Namen werden zu Token-Slugs (dedupliziert, Fallback `color-N`) | `index.html`, `styles.css`, `export-pack.js` |
-| ✅ | **Hexle** — tägliches Farb-Rätsel (Fable-Feature #1): Tagesfarbe deterministisch aus dem Datum (FNV-1a-Hash + mulberry32-PRNG, **kein Server**, für alle gleich). **Multiple Choice**: 5 Hex-Codes (Ziel + 4 nahe Distraktoren, seeded gemischt), **3 Fehlgriffe = verloren**. Streak (+ Missed-Day-Bruch), Wordle-artiges Emoji-Share (`🟩`/`⬛`), Farbe in den Stash speichern. State in `localStorage`, überlebt Reload | `index.html`, `styles.css`, `hexle.js` |
+| ✅ | **Bild → Palette** (Fable-Feature #2): Bild droppen/einfügen/auswählen → dominante Farben werden **komplett on-device** extrahiert (Canvas-Downsample + Median-Cut, nach Luminanz sortiert), 1 Klick in den Input. Kein Upload. Privacy als Alleinstellung. Drag/Drop auf die Preview + globales Paste (Ctrl+V) | `index.html`, `styles.css`, `main.js` |
+| ✅ | **Dev-Export-Pack** (Fable-Feature #5): der `{}`-Button öffnet ein Format-Menü mit CSS-Variablen, **OKLCH**, SCSS, **Tailwind-Config**, **W3C-Design-Tokens (JSON)**. Namen werden zu Token-Slugs (dedupliziert, Fallback `color-N`) | `index.html`, `styles.css`, `export-pack.js` |
+| ✅ | **Hexle**, tägliches Farb-Rätsel (Fable-Feature #1): Tagesfarbe deterministisch aus dem Datum (FNV-1a-Hash + mulberry32-PRNG, **kein Server**, für alle gleich). **Multiple Choice**: 5 Hex-Codes (Ziel + 4 nahe Distraktoren, seeded gemischt), **3 Fehlgriffe = verloren**. Streak (+ Missed-Day-Bruch), Wordle-artiges Emoji-Share (`🟩`/`⬛`), Farbe in den Stash speichern. State in `localStorage`, überlebt Reload | `index.html`, `styles.css`, `hexle.js` |
 | ✅ | **Feature-Dateien ausgelagert**: jede Feature in eigener Datei (`export-pack.js`, `image-palette.js`, `hexle.js`), klassische `<script defer>` nach `main.js` (kein Build-Step, keine Module → `file://` bleibt lauffähig), teilen sich `main.js`-Globals. `main.js` = Kern + geteilte Farb-Helfer | `index.html`, `sw.js`, alle `*.js` |
 
-**Fable-Brief — Sticky-Features-Roadmap (noch offen, priorisiert):**
+**Fable-Brief: Sticky-Features-Roadmap (noch offen, priorisiert).**
 
 | Prio | Feature | Pitch | Constraint |
 |------|---------|-------|------------|
