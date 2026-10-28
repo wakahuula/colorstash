@@ -9,6 +9,19 @@
   "background_color": "#0c0c0d",
   "theme_color": "#0c0c0d",
   "categories": ["utilities", "productivity", "graphics"],
+  "share_target": {
+    "action": "./__share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "./src/assets/icons/icon-192.png",

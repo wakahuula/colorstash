@@ -1,10 +1,33 @@
-// Color Stash — image → palette extraction (100% on-device, canvas only).
-// Loaded as a classic <script defer> after main.js, so it shares main.js's
-// globals: preview, colorInput, applyColor, relativeLuminance, showToast, setStatus.
+// Color Stash: image to palette extraction (100% on-device, canvas only).
+//
+// Loaded as a classic <script defer> after main.js. Dependencies come from the
+// window.ColorStash contract rather than from bare globals.
+// Destructuring into bare names does NOT work: classic scripts share one global
+// scope, so `const { preview } = …` collides with main.js and throws.
+
 
 const imageExtractButton = document.getElementById("imageExtractButton");
 const imageFileInput = document.getElementById("imageFileInput");
 const imageRow = document.getElementById("imageRow");
+
+// Plain DOM lookups, not part of the ColorStash contract: an element id is not
+// an application API, and main.js has no reason to re-export it.
+const previewEl = document.getElementById("preview");
+const colorInputEl = document.getElementById("colorInput");
+
+// Downsample by total pixel count, not by longest edge. Scaling to a fixed
+// longest edge collapsed anything wide and short. A 4000×300 banner became
+// 120×9, i.e. 1080 pixels to pick six colors out of.
+const TARGET_PIXELS = 16000;
+const MIN_EDGE = 48;
+
+function downsampleSize(width, height) {
+  const scale = Math.min(1, Math.sqrt(TARGET_PIXELS / (width * height)));
+  return {
+    w: Math.max(MIN_EDGE, Math.round(width * scale)),
+    h: Math.max(MIN_EDGE, Math.round(height * scale)),
+  };
+}
 
 function handleImageFile(event) {
   const file = event.target.files && event.target.files[0];
@@ -14,32 +37,40 @@ function handleImageFile(event) {
 
 function setupImageDropAndPaste() {
   ["dragenter", "dragover"].forEach((type) => {
-    preview.addEventListener(type, (event) => {
+    previewEl.addEventListener(type, (event) => {
       if (!dataTransferHasFiles(event.dataTransfer)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
-      preview.classList.add("drop-active");
+      previewEl.classList.add("drop-active");
     });
   });
 
-  preview.addEventListener("dragleave", (event) => {
-    if (preview.contains(event.relatedTarget)) return; // still inside the panel
-    preview.classList.remove("drop-active");
+  previewEl.addEventListener("dragleave", (event) => {
+    if (previewEl.contains(event.relatedTarget)) return; // still inside the panel
+    previewEl.classList.remove("drop-active");
   });
 
-  preview.addEventListener("drop", (event) => {
+  previewEl.addEventListener("drop", (event) => {
     if (!dataTransferHasFiles(event.dataTransfer)) return;
     // Stop the browser from navigating to the dropped file, even if it isn't an image.
     event.preventDefault();
-    preview.classList.remove("drop-active");
+    previewEl.classList.remove("drop-active");
     const file = imageFileFromDataTransfer(event.dataTransfer);
     if (file) extractPaletteFromFile(file);
-    else showToast("Drop an image file to extract its colors.", "error");
+    else ColorStash.showToast("Drop an image file to extract its colors.", "error");
   });
 
   document.addEventListener("paste", (event) => {
     const file = imageFileFromDataTransfer(event.clipboardData);
-    if (file) extractPaletteFromFile(file);
+    if (!file) return;
+    // A pasted image must not hijack a text field: pasting a screenshot while
+    // renaming a swatch used to fire an extraction and swallow the paste.
+    const target = event.target;
+    if (target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest("input, textarea, select"))) {
+      return;
+    }
+    extractPaletteFromFile(file);
   });
 }
 
@@ -59,7 +90,7 @@ function imageFileFromDataTransfer(dt) {
 
 function extractPaletteFromFile(file) {
   if (!file.type.startsWith("image/")) {
-    showToast("That doesn't look like an image.", "error");
+    ColorStash.showToast("That doesn't look like an image.", "error");
     return;
   }
 
@@ -72,32 +103,29 @@ function extractPaletteFromFile(file) {
       const colors = extractColors(img, 6);
       renderImagePalette(colors);
       if (colors.length) {
-        showToast(`Found ${colors.length} colors — the image never left your device.`, "success");
-        setStatus(`Extracted ${colors.length} colors from the image.`, "success");
+        ColorStash.showToast(`Found ${colors.length} colors.`, "success");
+        ColorStash.setStatus(`Extracted ${colors.length} colors from the image.`, "success");
       } else {
-        showToast("Couldn't read colors from that image.", "error");
-        setStatus("Couldn't read colors from that image.", "error");
+        ColorStash.showToast("Couldn't read colors from that image.", "error");
+        ColorStash.setStatus("Couldn't read colors from that image.", "error");
       }
     } catch {
-      showToast("Couldn't read that image in this browser.", "error");
-      setStatus("Couldn't read that image in this browser.", "error");
+      ColorStash.showToast("Couldn't read that image in this browser.", "error");
+      ColorStash.setStatus("Couldn't read that image in this browser.", "error");
     }
   };
 
   img.onerror = () => {
     URL.revokeObjectURL(url);
-    showToast("Couldn't load that image.", "error");
-    setStatus("Couldn't load that image.", "error");
+    ColorStash.showToast("Couldn't load that image.", "error");
+    ColorStash.setStatus("Couldn't load that image.", "error");
   };
 
   img.src = url;
 }
 
 function extractColors(img, count) {
-  const maxDim = 120; // downsample: enough signal, stays instant
-  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.max(1, Math.round(img.naturalWidth * scale));
-  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const { w, h } = downsampleSize(img.naturalWidth, img.naturalHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -123,7 +151,7 @@ function extractColors(img, count) {
   });
 
   // Light → dark reads as a tidy ramp.
-  hexes.sort((a, b) => relativeLuminance(b) - relativeLuminance(a));
+  hexes.sort((a, b) => ColorStash.relativeLuminance(b) - ColorStash.relativeLuminance(a));
   return hexes;
 }
 
@@ -209,16 +237,90 @@ function renderImagePalette(hexes) {
 
     button.append(chip, label);
     button.addEventListener("click", () => {
-      colorInput.value = hex;
-      applyColor(hex);
-      setStatus(`#${hex} loaded from the image palette.`);
+      colorInputEl.value = hex;
+      ColorStash.applyColor(hex);
+      ColorStash.setStatus(`#${hex} loaded.`);
     });
     fragment.appendChild(button);
   });
 
+  if (hexes.length) fragment.appendChild(buildImagePaletteActions(hexes));
+
   imageRow.replaceChildren(fragment);
+}
+
+// Clicking six swatches one by one to keep a palette was the obvious missing
+// button. These close the loop: save the whole extraction, or drop it.
+function buildImagePaletteActions(hexes) {
+  const bar = document.createElement("div");
+  bar.className = "image-row-actions";
+
+  const saveAll = document.createElement("button");
+  saveAll.type = "button";
+  saveAll.className = "ghost-button image-row-action";
+  saveAll.innerHTML = '<svg class="icon button-icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>'
+    + `<span>Save all ${hexes.length}</span>`;
+  saveAll.addEventListener("click", () => saveExtractedPalette(hexes));
+
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "icon-button image-row-clear";
+  clear.setAttribute("aria-label", "Clear extracted colors");
+  clear.title = "Clear";
+  clear.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>';
+  clear.addEventListener("click", clearImagePalette);
+
+  bar.append(saveAll, clear);
+  return bar;
+}
+
+function saveExtractedPalette(hexes) {
+  const current = ColorStash.stash;
+  const fresh = hexes
+    .map((hex) => ({ hex: ColorStash.normalizeHex(hex), name: "" }))
+    .filter((entry) => !current.some((existing) => existing.hex === entry.hex));
+
+  if (!fresh.length) {
+    ColorStash.showToast("Those colors are already in your stash.", "error");
+    ColorStash.setStatus("Those colors are already in your stash.", "error");
+    return;
+  }
+
+  const merged = ColorStash.mergeStashEntries(current, fresh);
+  ColorStash.replaceStash(merged.entries);
+  ColorStash.persistColorStash();
+  ColorStash.renderSavedColors();
+
+  const label = `Saved ${merged.added} color${merged.added === 1 ? "" : "s"} from the image.`;
+  ColorStash.showToast(label, "success");
+  ColorStash.setStatus(label, "success");
+  clearImagePalette();
+}
+
+function clearImagePalette() {
+  // Back to :empty, so the drop-hint pseudo-element returns.
+  imageRow.replaceChildren();
+}
+
+// A shared image arrives as a POST the service worker parked in a cache. The file
+// is claimed exactly once, so reloading afterwards does not re-trigger it.
+async function consumeSharedImage() {
+  if (!("caches" in window)) return;
+  try {
+    const cache = await caches.open("colorstash-share");
+    const parked = await cache.match("/__shared-image");
+    if (!parked) return;
+    await cache.delete("/__shared-image");
+
+    const blob = await parked.blob();
+    extractPaletteFromFile(new File([blob], "shared-image", { type: blob.type || "image/png" }));
+    ColorStash.showToast("Image received.", "success");
+  } catch {
+    // No share in flight, or storage refused. Nothing to do.
+  }
 }
 
 imageExtractButton.addEventListener("click", () => imageFileInput.click());
 imageFileInput.addEventListener("change", handleImageFile);
 setupImageDropAndPaste();
+consumeSharedImage();

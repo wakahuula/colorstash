@@ -1,7 +1,13 @@
 const DEFAULT_COLOR = "446CCF";
 const STORAGE_KEY = "savedColorStash";
 const THEME_KEY = "colorStashTheme";
-const SHADE_STOPS = [0.92, 0.82, 0.72, 0.6, 0.5, 0.4, 0.3, 0.2, 0.12];
+// Four tints, the color itself, four shades, expressed as a mix toward white
+// (positive) or black (negative). Shades go deeper than tints because mixing
+// toward black darkens perceptually faster than mixing toward white lightens.
+// Absolute HSL lightness stops only ever produced tints for dark colors.
+const RAMP_MIXES = [0.8, 0.6, 0.4, 0.2, 0, -0.15, -0.3, -0.5, -0.7];
+const WHITE_HEX = "FFFFFF";
+const BLACK_HEX = "000000";
 const HARMONIES = [
   { label: "Comp", offset: 180 },
   { label: "Triad", offset: 120 },
@@ -17,6 +23,7 @@ const THEME_COLORS = {
 const savedColorsEl = document.getElementById("savedColors");
 const preview = document.getElementById("preview");
 const previewSwatch = document.getElementById("previewSwatch");
+const previewSwatchMeta = document.querySelector(".preview-swatch-meta");
 const colorInput = document.getElementById("colorInput");
 const colorPickerInput = document.getElementById("colorPickerInput");
 const activeHexLabel = document.getElementById("activeHexLabel");
@@ -38,31 +45,60 @@ const shadesRow = document.getElementById("shadesRow");
 const harmonyRow = document.getElementById("harmonyRow");
 const themeToggleButton = document.getElementById("themeToggleButton");
 const themeToggleIcon = document.getElementById("themeToggleIcon");
+const liveThemeButton = document.getElementById("liveThemeButton");
 const colorCardTemplate = document.getElementById("colorCardTemplate");
 const toastContainer = document.getElementById("toastContainer");
 const themeMeta = document.querySelector('meta[name="theme-color"]');
 
+const LIVE_THEME_KEY = "colorStashLiveTheme";
 const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
 let savedColorStash = loadColorStash();
 let themePreference = loadThemePreference();
+let liveTheme = loadLiveTheme();
 let draggedHex = null;
+
+// The whole cross-file contract, in one place. Feature files reference
+// `ColorStash.x` at the call site instead of reaching for bare globals, so
+// renaming anything below shows up as exactly one undefined reference instead
+// of a silent breakage inside hexle.js the first time somebody clicks an
+// option. Note that this must stay a property access: destructuring it into a
+// bare name throws, because classic scripts share one global scope.
+window.ColorStash = {
+  // color maths (color.js), used by the export pack and Hexle
+  sanitizeHex, isValidHex, normalizeHex, formatHex,
+  hexToRgbString, hexToRgbaString, mixHex,
+  hexToHsl, hexToHslString, hslToHex,
+  relativeLuminance, contrastRatio, gradeForRatio,
+  hexToOklab, hexToOklch, oklchToHexClamped, luminanceToHex,
+  compositeOver, ensureContrast,
+  // stash plumbing
+  toStashEntry, mergeStashEntries, slugify, paletteSlugs,
+  persistColorStash, renderSavedColors, addSavedColor,
+  // ui
+  applyColor, showToast, setStatus,
+  toggleLiveTheme,
+  // live stash reference; read via ColorStash.stash
+  get stash() { return savedColorStash; },
+  replaceStash(next) { savedColorStash = next; },
+};
 
 init();
 registerServiceWorker();
 
 function registerServiceWorker() {
-  // Needs a secure context (https or localhost) — silently skipped on file://.
+  // Needs a secure context (https or localhost), silently skipped on file://.
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {
-      // Registration failure is non-fatal — the app still works online.
+      // Registration failure is non-fatal, the app still works online.
     });
   });
 }
 
 function init() {
   applyTheme(getResolvedTheme(), false);
+  applyLiveTheme();
 
   colorInput.value = DEFAULT_COLOR;
   colorPickerInput.value = formatHex(DEFAULT_COLOR).toLowerCase();
@@ -84,6 +120,7 @@ function init() {
   importColorsButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFile);
   themeToggleButton.addEventListener("click", cycleThemePreference);
+  liveThemeButton.addEventListener("click", toggleLiveTheme);
   systemThemeQuery.addEventListener("change", handleSystemThemeChange);
   document.addEventListener("keydown", handleGlobalKeydown);
 
@@ -100,29 +137,33 @@ function handleInput(event) {
   const sanitized = sanitizeHex(event.target.value);
   event.target.value = sanitized;
 
+  if (isValidHex(sanitized)) {
+    applyColor(sanitized, false);
+    setStatus("Valid color.");
+    return;
+  }
+
+  // Incomplete input: show what was typed, but leave the preview, the picker and
+  // every derived panel on the last valid color. Committing the padded value
+  // used to flip the whole app's accent through greys on every keystroke, and
+  // left the contrast badges and shade strip describing a different color than
+  // the headline hex.
+  activeHexLabel.textContent = `#${sanitized}`;
+  activeRgbLabel.textContent = "…";
+  if (activeHslLabel) activeHslLabel.textContent = "…";
+
   if (!sanitized) {
     setStatus("Enter a 3 or 6 digit hex color.");
-    applyColor(DEFAULT_COLOR, false);
-    return;
+  } else {
+    setStatus("Keep going, hex colors use 3 or 6 characters.", "error");
   }
-
-  if (!isValidHex(sanitized)) {
-    setStatus("Keep going — hex colors use 3 or 6 characters.", "error");
-    updatePreviewDisplay(expandHexForPreview(sanitized), sanitized.toUpperCase(), false);
-    activeRgbLabel.textContent = "—";
-    if (activeHslLabel) activeHslLabel.textContent = "—";
-    return;
-  }
-
-  applyColor(sanitized, false);
-  setStatus("Ready to save this color.");
 }
 
 function handleColorPickerInput(event) {
   const pickedColor = sanitizeHex(event.target.value);
   colorInput.value = pickedColor;
   applyColor(pickedColor, false);
-  setStatus("Color picked. Save it if you want to keep it.");
+  setStatus("Color picked.");
 }
 
 function handleInputKeydown(event) {
@@ -131,8 +172,19 @@ function handleInputKeydown(event) {
   }
 }
 
+// Matches any open dialog regardless of which feature owns it, so new dialogs
+// inherit the shortcut guard for free.
+function isDialogOpen() {
+  const modal = document.getElementById("hexleModal");
+  return !!document.querySelector('[role="dialog"]:not([hidden])') || (modal && modal.open);
+}
+
 function handleGlobalKeydown(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+  // Single-key shortcuts must not reach through an open dialog. Hexle is a
+  // full-screen overlay, so S/C/R would save or copy the color behind it.
+  if (isDialogOpen()) return;
 
   // Don't hijack typing in fields (the hex input accepts "c", etc.).
   const target = event.target;
@@ -167,6 +219,20 @@ function handleGlobalKeydown(event) {
   }
 }
 
+// Adds to the top of the stash without re-rendering. A full render on every save
+// destroyed focus if you were typing a name into another card, and re-played the
+// entry animation on every existing card.
+function addSavedColor(entry) {
+  savedColorStash.unshift(entry);
+  persistColorStash();
+
+  const emptyState = savedColorsEl.querySelector(".empty-state");
+  if (emptyState) emptyState.remove();
+
+  savedColorsEl.insertBefore(createColorCard(entry), savedColorsEl.firstChild);
+  updateStashCount();
+}
+
 function saveCurrentColor() {
   const color = sanitizeHex(colorInput.value);
 
@@ -183,9 +249,7 @@ function saveCurrentColor() {
     return;
   }
 
-  savedColorStash.unshift({ hex: normalized, name: "" });
-  persistColorStash();
-  renderSavedColors();
+  addSavedColor({ hex: normalized, name: "" });
   applyColor(normalized);
   showToast(`${formatHex(normalized)} added to your stash.`, "success");
   setStatus(`${formatHex(normalized)} added to your stash.`, "success");
@@ -226,7 +290,7 @@ function applyRandomColor() {
 
   colorInput.value = randomColor;
   applyColor(randomColor);
-  setStatus("Random color generated. Save it if you like it.");
+  setStatus("Random color.");
 }
 
 function clearAllColors() {
@@ -308,17 +372,62 @@ function getSystemTheme() {
   return systemThemeQuery.matches ? "dark" : "light";
 }
 
+// Storage can throw outright when blocked (embedded webviews, aggressive privacy
+// settings). This runs at module scope, before init(), so an unguarded throw here
+// would leave the page blank. The theme still applies; only persistence is lost.
 function loadThemePreference() {
-  const savedTheme = localStorage.getItem(THEME_KEY);
-  return savedTheme === "dark" || savedTheme === "light" ? savedTheme : "system";
+  try {
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    return savedTheme === "dark" || savedTheme === "light" ? savedTheme : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function loadLiveTheme() {
+  try {
+    return localStorage.getItem(LIVE_THEME_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function persistLiveTheme() {
+  try {
+    localStorage.setItem(LIVE_THEME_KEY, liveTheme ? "true" : "false");
+  } catch {
+    // Non-fatal, the mode applies for this session either way.
+  }
+}
+
+// The palette has no color of its own until the user picks one. This lets the
+// whole chrome adopt whatever is currently selected, which is the moment a color
+// tool stops being a lookup table. It only re-points tokens, no component needs
+// to know about it.
+function toggleLiveTheme() {
+  liveTheme = !liveTheme;
+  persistLiveTheme();
+  applyLiveTheme();
+  const label = liveTheme ? "Live theme on" : "Live theme off";
+  showToast(`${label}.`, "success");
+  setStatus(`${label}.`, "success");
+}
+
+function applyLiveTheme() {
+  document.documentElement.dataset.liveTheme = liveTheme ? "on" : "off";
+  liveThemeButton.setAttribute("aria-pressed", liveTheme ? "true" : "false");
 }
 
 function persistThemePreference() {
-  if (themePreference === "system") {
-    localStorage.removeItem(THEME_KEY);
-    return;
+  try {
+    if (themePreference === "system") {
+      localStorage.removeItem(THEME_KEY);
+      return;
+    }
+    localStorage.setItem(THEME_KEY, themePreference);
+  } catch {
+    // Non-fatal, the theme applies for this session either way.
   }
-  localStorage.setItem(THEME_KEY, themePreference);
 }
 
 function renderSavedColors() {
@@ -327,7 +436,7 @@ function renderSavedColors() {
   if (!savedColorStash.length) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
-    emptyState.innerHTML = `<svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-palette"></use></svg>No saved colors yet. Preview a shade, then save the ones worth keeping.`;
+    emptyState.innerHTML = `<svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-palette"></use></svg>No saved colors yet.`;
     savedColorsEl.appendChild(emptyState);
     updateStashCount();
     return;
@@ -376,7 +485,7 @@ function createColorCard(entry) {
   swatchButton.addEventListener("click", () => {
     colorInput.value = hex;
     applyColor(hex);
-    setStatus(`${formatHex(hex)} loaded from your stash.`);
+    setStatus(`${formatHex(hex)} loaded.`);
   });
 
   hexLabel.addEventListener("click", () => copyText(formatHex(hex)));
@@ -449,7 +558,7 @@ function reorderSavedColor(fromHex, toHex, insertAfter) {
   const [moved] = savedColorStash.splice(fromIndex, 1);
   let toIndex = savedColorStash.findIndex((entry) => entry.hex === toHex);
   if (toIndex < 0) {
-    savedColorStash.splice(fromIndex, 0, moved); // target vanished — undo the removal
+    savedColorStash.splice(fromIndex, 0, moved); // target vanished, undo the removal
     return;
   }
   if (insertAfter) toIndex += 1;
@@ -497,15 +606,17 @@ function applyColor(color, syncInput = true) {
     colorInput.value = normalized;
   }
 
-  updatePreviewDisplay(normalized, normalized, true);
+  updatePreviewDisplay(normalized);
 }
 
-function updatePreviewDisplay(color, labelColor, isValid) {
+// Only ever called for a valid, normalized color. This used to take an isValid
+// flag so half-typed input could repaint the preview; that made the panel
+// describe two different colors at once. Partial input now leaves it alone.
+function updatePreviewDisplay(color) {
   const formattedColor = `#${color}`;
   preview.style.backgroundColor = formattedColor;
-  previewSwatch.style.backgroundColor = "transparent";
   colorPickerInput.value = formattedColor.toLowerCase();
-  activeHexLabel.textContent = `#${labelColor}`;
+  activeHexLabel.textContent = formattedColor;
 
   const r = parseInt(color.slice(0, 2), 16);
   const g = parseInt(color.slice(2, 4), 16);
@@ -514,13 +625,57 @@ function updatePreviewDisplay(color, labelColor, isValid) {
   document.documentElement.style.setProperty("--current-color", formattedColor);
   document.documentElement.style.setProperty("--current-color-glow", `rgba(${r},${g},${b},${glowAlpha})`);
 
-  if (isValid) {
-    activeRgbLabel.textContent = hexToRgbString(color);
-    if (activeHslLabel) activeHslLabel.textContent = hexToHslString(color);
-    updateContrast(color);
-    renderShades(color);
-    renderHarmonies(color);
-  }
+  activeRgbLabel.textContent = hexToRgbString(color);
+  if (activeHslLabel) activeHslLabel.textContent = hexToHslString(color);
+  updateContrast(color);
+  updateCardContrast(color);
+  renderShades(color);
+  renderHarmonies(color);
+}
+
+// The preview card floats on a translucent overlay above the current color, so
+// its backdrop is whatever the user happens to have picked. A fixed text color
+// cannot be contrast-guaranteed against that range. Measured 1.6:1 for a dim
+// grey on a white current color, and no overlay alpha fixes it without killing
+// the glass. So the card's text colors are derived per color instead: keep the
+// hue, move only the lightness, until it clears 4.5:1 against the real backdrop.
+function updateCardContrast(color) {
+  const styles = getComputedStyle(previewSwatchMeta);
+  const overlay = parseRgba(styles.getPropertyValue("--overlay"));
+  // The overlay goes *on top of* the color, so it is the foreground here.
+  const overlayHex = [overlay.r, overlay.g, overlay.b]
+    .map((v) => Math.round(v).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+  const backdrop = compositeOver(overlayHex, overlay.a, color);
+
+  const bgLum = relativeLuminance(backdrop);
+  const onDark = bgLum < 0.18;
+  // 4.55 rather than 4.50: the derived value is quantised to 8 bits per channel,
+  // and rounding can shave ~0.02 off the achieved ratio.
+  const FLOOR = 4.55;
+  const required = onDark
+    ? Math.min(1, FLOOR * (bgLum + 0.05) - 0.05)
+    : Math.max(0, (bgLum + 0.05) / FLOOR - 0.05);
+
+  previewSwatchMeta.style.setProperty("--card-fg", luminanceToHex(onDark ? 1 : 0));
+  // Secondary text sits exactly at the contrast floor, the primary gets the full
+  // range. On a mid-tone backdrop the floor and the range nearly meet, so the two
+  // converge rather than the secondary failing silently.
+  previewSwatchMeta.style.setProperty("--card-fg-muted", luminanceToHex(required));
+  previewSwatchMeta.style.setProperty(
+    "--card-success",
+    ensureContrast(styles.getPropertyValue("--color-success").trim() || "#4ade80", backdrop, FLOOR)
+  );
+  previewSwatchMeta.style.setProperty(
+    "--card-error",
+    ensureContrast(styles.getPropertyValue("--color-error").trim() || "#f87171", backdrop, FLOOR)
+  );
+}
+
+function parseRgba(value) {
+  const parts = String(value).match(/[\d.]+/g).map(Number);
+  return { r: parts[0] || 0, g: parts[1] || 0, b: parts[2] || 0, a: parts[3] === undefined ? 1 : parts[3] };
 }
 
 function updateStashCount() {
@@ -538,151 +693,18 @@ function loadColorStash() {
 }
 
 // Accepts the legacy string format ("446CCF") and the current object format ({hex, name}).
-function toStashEntry(value) {
-  const raw = typeof value === "string" ? value : value && value.hex;
-  if (!isValidHex(raw)) return null;
-  const name = value && typeof value.name === "string" ? value.name.trim() : "";
-  return { hex: normalizeHex(raw), name };
-}
-
 // Prepends new colors (newest-first), dedupes by hex, and fills empty names from imports.
 // Returns how many colors were newly added.
-function mergeStashEntries(incoming) {
-  const byHex = new Map(savedColorStash.map((entry) => [entry.hex, entry]));
-  const fresh = [];
-
-  incoming.forEach((entry) => {
-    const existing = byHex.get(entry.hex);
-    if (existing) {
-      if (!existing.name && entry.name) existing.name = entry.name;
-      return;
-    }
-    const created = { hex: entry.hex, name: entry.name };
-    byHex.set(entry.hex, created);
-    fresh.push(created);
-  });
-
-  savedColorStash = [...fresh, ...savedColorStash];
-  return fresh.length;
-}
-
 function persistColorStash() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedColorStash));
   } catch {
-    showToast("Couldn't save — browser storage is full or blocked.", "error");
+    showToast("Couldn't save: browser storage is full or blocked.", "error");
     setStatus("Couldn't save to browser storage.", "error");
   }
 }
 
-function sanitizeHex(value) {
-  return value.replace(/[^0-9a-f]/gi, "").replace(/^#/, "").slice(0, 6).toUpperCase();
-}
-
-function isValidHex(color) {
-  return /^[0-9A-F]{3}([0-9A-F]{3})?$/.test(sanitizeHex(color));
-}
-
-function normalizeHex(color) {
-  const sanitized = sanitizeHex(color);
-  if (sanitized.length === 3) {
-    return sanitized.split("").map((c) => c + c).join("");
-  }
-  return sanitized.padEnd(6, "0");
-}
-
-function expandHexForPreview(color) {
-  const sanitized = sanitizeHex(color);
-  if (sanitized.length >= 6) return sanitized.slice(0, 6);
-  return sanitized.padEnd(6, sanitized[sanitized.length - 1] || "0");
-}
-
-function formatHex(color) {
-  return `#${normalizeHex(color)}`;
-}
-
-function hexToRgbString(color) {
-  const n = normalizeHex(color);
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function hexToRgbaString(color, alpha) {
-  const n = normalizeHex(color);
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function hexToHsl(color) {
-  const n = normalizeHex(color);
-  const r = parseInt(n.slice(0, 2), 16) / 255;
-  const g = parseInt(n.slice(2, 4), 16) / 255;
-  const b = parseInt(n.slice(4, 6), 16) / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-
-  if (delta !== 0) {
-    s = delta / (1 - Math.abs(2 * l - 1));
-    if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
-    else if (max === g) h = ((b - r) / delta + 2) / 6;
-    else h = ((r - g) / delta + 4) / 6;
-  }
-
-  return { h: h * 360, s, l };
-}
-
-function hexToHslString(color) {
-  const { h, s, l } = hexToHsl(color);
-  return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
-}
-
-function hslToHex(h, s, l) {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = (((h % 360) + 360) % 360) / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
-  let r = 0, g = 0, b = 0;
-  if (hp < 1) [r, g, b] = [c, x, 0];
-  else if (hp < 2) [r, g, b] = [x, c, 0];
-  else if (hp < 3) [r, g, b] = [0, c, x];
-  else if (hp < 4) [r, g, b] = [0, x, c];
-  else if (hp < 5) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-  const m = l - c / 2;
-  const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0").toUpperCase();
-  return `${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
 /* ── Contrast (WCAG) ─────────────────────────── */
-
-function relativeLuminance(color) {
-  const n = normalizeHex(color);
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const channel = parseInt(n.slice(i, i + 2), 16) / 255;
-    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function contrastRatio(lumA, lumB) {
-  const lighter = Math.max(lumA, lumB);
-  const darker = Math.min(lumA, lumB);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function gradeForRatio(ratio) {
-  if (ratio >= 7) return { label: "AAA", tone: "pass" };
-  if (ratio >= 4.5) return { label: "AA", tone: "pass" };
-  if (ratio >= 3) return { label: "AA Large", tone: "" };
-  return { label: "Fail", tone: "fail" };
-}
 
 function updateContrast(color) {
   const lum = relativeLuminance(color);
@@ -700,24 +722,38 @@ function updateContrast(color) {
 
 /* ── Shades & tints ──────────────────────────── */
 
+// mixHex lives in color.js, it is pure and tested there.
+
 function renderShades(color) {
-  const { h, s } = hexToHsl(color);
   const currentHex = normalizeHex(color);
   const fragment = document.createDocumentFragment();
+  let previous = null;
 
-  SHADE_STOPS.forEach((lightness) => {
-    const shade = hslToHex(h, s, lightness);
+  RAMP_MIXES.forEach((amount) => {
+    const shade = amount === 0
+      ? currentHex
+      : mixHex(currentHex, amount > 0 ? WHITE_HEX : BLACK_HEX, Math.abs(amount));
+
+    // Collapse identical steps so an extreme like #FFFFFF doesn't render as a
+    // row of the same swatch.
+    if (shade === previous) return;
+    previous = shade;
+
+    const label = amount === 0
+      ? "Base"
+      : `${amount > 0 ? "Tint" : "Shade"} ${Math.round(Math.abs(amount) * 100)}%`;
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "shade-swatch";
     button.style.backgroundColor = `#${shade}`;
-    button.title = `#${shade}`;
-    button.setAttribute("aria-label", `Use #${shade}`);
+    button.title = `${label} · #${shade}`;
+    button.setAttribute("aria-label", `${label} #${shade}`);
     if (shade === currentHex) button.classList.add("is-current");
     button.addEventListener("click", () => {
       colorInput.value = shade;
       applyColor(shade);
-      setStatus(`#${shade} loaded from shades.`);
+      setStatus(`${label} applied.`);
     });
     fragment.appendChild(button);
   });
@@ -751,7 +787,7 @@ function renderHarmonies(color) {
     button.addEventListener("click", () => {
       colorInput.value = harmony;
       applyColor(harmony);
-      setStatus(`#${harmony} loaded from harmonies.`);
+      setStatus(`${label} harmony applied.`);
     });
     fragment.appendChild(button);
   });
@@ -771,9 +807,9 @@ function setupEyeDropper() {
       const picked = sanitizeHex(result.sRGBHex);
       colorInput.value = picked;
       applyColor(picked);
-      setStatus("Color picked from screen. Save it if you like it.");
+      setStatus("Color picked from screen.");
     } catch {
-      // User dismissed the eyedropper — nothing to do.
+      // User dismissed the eyedropper, nothing to do.
     }
   });
 }
@@ -787,16 +823,21 @@ async function sharePalette() {
     return;
   }
 
+  // Names go in the link: they are the part that makes a palette a palette rather
+  // than a list of hex codes. Each part is encoded separately so commas and tildes
+  // inside a name cannot break the split.
   const url = new URL(window.location.href);
-  url.hash = savedColorStash.map((entry) => entry.hex).join(",");
+  url.hash = savedColorStash
+    .map((entry) => `${entry.hex}~${encodeURIComponent(entry.name || "")}`)
+    .join(",");
   window.history.replaceState(null, "", url.toString());
 
   try {
     await navigator.clipboard.writeText(url.toString());
-    showToast(`Share link copied — ${savedColorStash.length} colors.`, "success");
+    showToast(`Share link copied: ${savedColorStash.length} colors.`, "success");
     setStatus("Shareable link copied to your clipboard.", "success");
   } catch {
-    showToast("Link is in the address bar — copy it manually.", "error");
+    showToast("Link is in the address bar, copy it manually.", "error");
     setStatus("Couldn't copy automatically; the link is in the address bar.", "error");
   }
 }
@@ -805,14 +846,29 @@ function importPaletteFromHash() {
   const hash = window.location.hash.replace(/^#/, "");
   if (!hash) return null;
 
-  const incoming = hash.split(",").map(toStashEntry).filter(Boolean);
+  const incoming = hash.split(",").map((part) => {
+    const tilde = part.indexOf("~");
+    const rawHex = tilde === -1 ? part : part.slice(0, tilde);
+    const rawName = tilde === -1 ? "" : part.slice(tilde + 1);
+    let hex;
+    let name;
+    try {
+      hex = decodeURIComponent(rawHex);
+      name = decodeURIComponent(rawName);
+    } catch {
+      return null; // malformed percent-encoding, skip rather than throw
+    }
+    return toStashEntry({ hex, name });
+  }).filter(Boolean);
+
   // Always clear the hash so a refresh doesn't re-import the same palette.
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
   if (!incoming.length) return null;
 
-  const added = mergeStashEntries(incoming);
+  const merged = mergeStashEntries(savedColorStash, incoming);
+  savedColorStash = merged.entries;
   persistColorStash();
-  const label = `Imported ${added} shared color${added === 1 ? "" : "s"}.`;
+  const label = `Imported ${merged.added} shared color${merged.added === 1 ? "" : "s"}.`;
   showToast(label, "success");
   setStatus(label, "success");
   return incoming[0].hex;
@@ -846,33 +902,6 @@ function exportPalette() {
 }
 
 // sRGB hex → OKLab (Björn Ottosson's matrices). Shared by the export pack (OKLCH).
-function hexToOklab(hex) {
-  const n = normalizeHex(hex);
-  const [lr, lg, lb] = [0, 2, 4].map((i) => {
-    const c = parseInt(n.slice(i, i + 2), 16) / 255;
-    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  });
-
-  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
-  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
-  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
-
-  return {
-    L: 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-  };
-}
-
-// sRGB hex → OKLCH.
-function hexToOklch(hex) {
-  const { L, a, b } = hexToOklab(hex);
-  const C = Math.sqrt(a * a + b * b);
-  let H = (Math.atan2(b, a) * 180) / Math.PI;
-  if (H < 0) H += 360;
-  return { L, C, H };
-}
-
 function handleImportFile(event) {
   const file = event.target.files && event.target.files[0];
   event.target.value = ""; // reset so the same file can be re-imported
@@ -896,11 +925,12 @@ function handleImportFile(event) {
         return;
       }
 
-      const added = mergeStashEntries(incoming);
+      const merged = mergeStashEntries(savedColorStash, incoming);
+      savedColorStash = merged.entries;
       persistColorStash();
       renderSavedColors();
 
-      const label = `Imported ${added} new color${added === 1 ? "" : "s"}.`;
+      const label = `Imported ${merged.added} new color${merged.added === 1 ? "" : "s"}.`;
       showToast(label, "success");
       setStatus(label, "success");
     } catch {
@@ -917,8 +947,8 @@ async function copyText(value) {
     showToast(`${value} copied.`, "success");
     setStatus(`${value} copied to your clipboard.`, "success");
   } catch {
-    showToast("Copy failed — you can copy it manually.", "error");
-    setStatus("Copy failed in this browser — you can copy it manually.", "error");
+    showToast("Copy failed, you can copy it manually.", "error");
+    setStatus("Copy failed in this browser, you can copy it manually.", "error");
   }
 }
 
@@ -931,6 +961,10 @@ function setStatus(message, tone) {
 function showToast(message, tone = "", action = null) {
   const toast = document.createElement("div");
   toast.className = `toast${tone ? ` ${tone}` : ""}`;
+
+  // Decorative toasts stay out of the accessibility tree. A toast with an action
+  // must not, or its button becomes focusable but unreachable by assistive tech.
+  if (!action) toast.setAttribute("aria-hidden", "true");
 
   const dot = document.createElement("span");
   dot.className = "toast-dot";
@@ -969,7 +1003,12 @@ function showToast(message, tone = "", action = null) {
 
 function dismissToast(toast) {
   toast.classList.add("dismissing");
-  toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  toast.addEventListener("animationend", () => {
+    // An expiring toast must not drop focus on the floor. This only became
+    // reachable when the Undo button moved outside aria-hidden.
+    if (toast.contains(document.activeElement)) toastContainer.focus();
+    toast.remove();
+  }, { once: true });
 }
 
 function capitalize(value) {
